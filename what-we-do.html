@@ -20,9 +20,9 @@
           </a>
         </div>
         <nav class="nav-menu" id="navMenu">
-          <a href="index.html" class="nav-link active">Home</a>
+          <a href="index.html" class="nav-link">Home</a>
           <a href="about-us.html" class="nav-link">About Us</a>
-          <a href="what-we-do.html" class="nav-link">What We Do</a>
+          <a href="what-we-do.html" class="nav-link active">What We Do</a>
           <a href="case-studies.html" class="nav-link">Case Studies</a>
           <a href="contact.html" class="nav-link">Contact</a>
           <a href="login.html" class="nav-link">Login</a>
@@ -36,19 +36,24 @@
     </header>
 
     <main>
-      <section id="home" class="hero hero-home">
+      <section class="hero hero-what-we-do">
         <div class="hero-background"></div>
         <div class="hero-overlay"></div>
         <div class="hero-content anim fade">
-          <h1>Transform manual processes into streamlined systems</h1>
-          <p>Custom enterprise software that eliminates manual workflows, cuts out inefficiencies, and makes your operations leaner and faster.</p>
-          <div class="hero-cta">
-            <a class="primary-btn consultation-btn" href="#" id="consultationBtn">Schedule Your Free Consultation</a>
-            <a class="ghost-btn" href="case-studies.html">View Case Studies</a>
-          </div>
+          <h1>What We Do</h1>
+          <p>Transforming manual processes into streamlined systems</p>
         </div>
       </section>
 
+      <section class="what-we-do">
+        <div class="section-header">
+          <p class="eyebrow">Our Services</p>
+          <h2>Custom enterprise software that eliminates manual workflows</h2>
+        </div>
+        <div class="text-block anim fade">
+          <p>You would be surprised how many companies still rely on emails and manual PDFs for critical processes. We build the software that replaces those outdated workflows with intelligent, automated systems.</p>
+        </div>
+      </section>
 
       <section class="process">
         <div class="section-header">
@@ -57,6 +62,7 @@
         </div>
         <div class="process-grid">
           <div class="process-card anim from-left">
+            <div class="process-image" style="background-image: url('https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&q=80');"></div>
             <div class="icon">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5.25h6M9 9h6m-6 3.75h4.5M9.75 3h4.5c.966 0 1.75.784 1.75 1.75v14.5a.75.75 0 0 1-.75.75H8.75a.75.75 0 0 1-.75-.75V4.75C8 3.784 8.784 3 9.75 3Z" />
@@ -66,6 +72,7 @@
             <p>We map your current workflows, dependencies, and pain points to uncover automation opportunities.</p>
           </div>
           <div class="process-card anim from-up">
+            <div class="process-image" style="background-image: url('https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&q=80');"></div>
             <div class="icon">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="m9.75 4.5-6.6 9.9c-.335.5.028 1.1.63 1.1H12L10.5 21l9.6-10.8c.4-.45.068-1.15-.53-1.15H12l1.5-4.55c.2-.6-.45-1.1-.95-.65Z" />
@@ -75,6 +82,7 @@
             <p>Rapid prototypes to validate flows, align stakeholders, and derisk delivery before heavy build.</p>
           </div>
           <div class="process-card anim from-right">
+            <div class="process-image" style="background-image: url('https://images.unsplash.com/photo-1551650975-87deedd944c3?w=600&q=80');"></div>
             <div class="icon">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -131,72 +139,16 @@
         </div>
       </section>
 
-      <section class="clients">
-        <div class="section-header">
-          <p class="eyebrow">Our Clients</p>
-          <h2>Built for medium to large size companies</h2>
-        </div>
-        <div class="text-block anim fade">
-          <p>We specialize in helping organizations with complex, multi-department workflows transform their operations. Our solutions scale with your business and integrate seamlessly into your existing infrastructure.</p>
-        </div>
-        <div class="clients-grid">
-          <div class="clients-card anim from-left">
-            <div class="icon">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
-              </svg>
-            </div>
-            <h3>Enterprise Scale</h3>
-            <p>Our systems handle thousands of users, complex approval workflows, and high-volume transactions without compromising performance.</p>
-          </div>
-          <div class="clients-card anim from-up">
-            <div class="icon">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
-              </svg>
-            </div>
-            <h3>Deep Integrations</h3>
-            <p>Connect with your existing enterprise tools—HRIS, ERP, SSO, email systems, and more—for a unified workflow experience.</p>
-          </div>
-          <div class="clients-card anim from-right">
-            <div class="icon">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
-              </svg>
-            </div>
-            <h3>Security & Compliance</h3>
-            <p>Enterprise-grade security, SOC 2 compliance, audit trails, and role-based access controls built into every solution.</p>
-          </div>
-          <div class="clients-card anim from-left">
-            <div class="icon">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
-              </svg>
-            </div>
-            <h3>Real-Time Analytics</h3>
-            <p>Comprehensive dashboards and reporting that give leadership visibility into processes, bottlenecks, and team performance.</p>
-          </div>
-          <div class="clients-card anim from-up">
-            <div class="icon">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15m-9.75 18v-9m0-12v9m-6 3.75h13.5A2.25 2.25 0 0 0 21 15.75V6a2.25 2.25 0 0 0-2.25-2.25H4.5A2.25 2.25 0 0 0 2.25 6v9.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-              </svg>
-            </div>
-            <h3>Multi-Department Coordination</h3>
-            <p>Unite HR, Finance, Operations, and other departments with shared workflows, approvals, and communication channels.</p>
-          </div>
-          <div class="clients-card anim from-right">
-            <div class="icon">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-              </svg>
-            </div>
-            <h3>Continuous Improvement</h3>
-            <p>Ongoing support and iterative enhancements to ensure your systems evolve with your business needs and industry changes.</p>
+      <section class="cta">
+        <div class="cta-card anim fade">
+          <h2>Ready to transform your workflows?</h2>
+          <p>Let us streamline your operations with custom software built specifically for your needs.</p>
+          <div class="cta-actions">
+            <a class="primary-btn consultation-btn" href="#" id="consultationBtn">Schedule Your Free Consultation</a>
+            <a class="ghost-btn" href="index.html">View Our Work</a>
           </div>
         </div>
       </section>
-
     </main>
 
     <!-- Consultation Modal -->
@@ -259,14 +211,12 @@
     const consultationForm = document.getElementById('consultationForm');
     const consultationSuccessMessage = document.getElementById('consultationSuccessMessage');
 
-    // Open consultation modal
     consultationBtn?.addEventListener('click', (e) => {
       e.preventDefault();
       consultationModal.style.display = 'flex';
       document.body.style.overflow = 'hidden';
     });
 
-    // Close consultation modal
     const closeConsultationModalFunc = () => {
       consultationModal.style.display = 'none';
       document.body.style.overflow = '';
@@ -277,26 +227,21 @@
     closeConsultationModal?.addEventListener('click', closeConsultationModalFunc);
     cancelConsultation?.addEventListener('click', closeConsultationModalFunc);
 
-    // Close modal when clicking outside
     consultationModal?.addEventListener('click', (e) => {
       if (e.target === consultationModal) {
         closeConsultationModalFunc();
       }
     });
 
-    // Handle consultation form submission
     consultationForm?.addEventListener('submit', (e) => {
       e.preventDefault();
       consultationSuccessMessage.style.display = 'block';
       consultationSuccessMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      
-      // Hide form after showing message
       setTimeout(() => {
         closeConsultationModalFunc();
       }, 4000);
     });
 
-    // Close consultation modal on Escape key
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && consultationModal.style.display === 'flex') {
         closeConsultationModalFunc();
@@ -305,3 +250,4 @@
   </script>
 </body>
 </html>
+

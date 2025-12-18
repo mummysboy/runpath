@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="./RunpathLabs_Logomark.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="page">
+    <header class="topbar" id="topbar">
+      <div class="topbar-container">
+        <div class="brand">
+          <a href="index.html">
+            <img src="./RunpathLabs_Logo-Combined_Reversed.png" alt="Runpath logo" class="logo">
+          </a>
+        </div>
+        <nav class="nav-menu" id="navMenu">
+          <a href="index.html" class="nav-link">Home</a>
+          <a href="about-us.html" class="nav-link">About Us</a>
+          <a href="what-we-do.html" class="nav-link">What We Do</a>
+          <a href="case-studies.html" class="nav-link">Case Studies</a>
+          <a href="contact.html" class="nav-link">Contact</a>
+          <a href="login.html" class="nav-link active">Login</a>
+        </nav>
+        <button class="menu-button" id="menuButton" aria-label="Open menu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="login-section">
+        <div class="login-container">
+          <div class="login-card anim fade">
+            <div class="login-header">
+              <h2>Welcome Back</h2>
+              <p>Sign in to access your client portal and track your project progress</p>
+            </div>
+            
+            <!-- Existing Client Section -->
+            <div class="login-form-section">
+              <div class="section-divider">
+                <span>Existing Clients</span>
+              </div>
+              <form id="loginForm" class="login-form">
+                <div class="form-group">
+                  <label for="email">Email Address</label>
+                  <input type="email" id="email" name="email" required placeholder="your.email@example.com">
+                </div>
+                <div class="form-group">
+                  <label for="password">Password</label>
+                  <input type="password" id="password" name="password" required placeholder="Enter your password">
+                </div>
+                <div id="loginError" class="error-message" style="display: none;">
+                  <p>No accounts are currently registered. Please contact support if you believe this is an error.</p>
+                </div>
+                <div class="form-options">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="remember">
+                    <span>Remember me</span>
+                  </label>
+                  <a href="#" class="forgot-link" id="forgotPasswordLink">Forgot password?</a>
+                </div>
+                <button type="submit" class="primary-btn login-btn">Sign In</button>
+              </form>
+            </div>
+
+            <!-- New Client Section -->
+            <div class="new-client-section">
+              <div class="section-divider">
+                <span>Not a client yet?</span>
+              </div>
+              <div class="new-client-content">
+                <p>Transform your business with custom enterprise software solutions. Get started today!</p>
+                <div class="client-benefits">
+                  <div class="benefit-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    <span>Streamlined workflows</span>
+                  </div>
+                  <div class="benefit-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
+                    </svg>
+                    <span>Faster processes</span>
+                  </div>
+                  <div class="benefit-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 0 0 2.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.228a46.32 46.32 0 0 1 2.916.52 6.003 6.003 0 0 1-5.395 4.972m0 0a6.726 6.726 0 0 1-2.749 1.35m0 0a6.772 6.772 0 0 1-3.044 0" />
+                    </svg>
+                    <span>Custom solutions</span>
+                  </div>
+                </div>
+                <a href="contact.html" class="primary-btn new-client-btn">Get Started Today</a>
+                <a href="what-we-do.html" class="ghost-btn">Learn More</a>
+              </div>
+            </div>
+
+            <div class="login-footer">
+              <p>Need help? <a href="#" class="contact-support-link" id="contactSupportLink">Contact support</a></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Forgot Password Modal -->
+      <div id="forgotPasswordModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Reset Password</h2>
+            <button class="modal-close" id="closeModal">&times;</button>
+          </div>
+          <form id="forgotPasswordForm" class="login-form">
+            <div class="form-group">
+              <label for="resetEmail">Email Address</label>
+              <input type="email" id="resetEmail" name="resetEmail" required placeholder="your.email@example.com">
+            </div>
+            <div id="resetSuccessMessage" class="success-message" style="display: none;">
+              <p>If this account exists, you will receive an email to reset your password.</p>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="primary-btn">Send Reset Link</button>
+              <button type="button" class="ghost-btn" id="cancelReset">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Contact Support Modal -->
+      <div id="contactSupportModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Contact Support</h2>
+            <button class="modal-close" id="closeContactModal">&times;</button>
+          </div>
+          <form id="contactSupportForm" class="login-form">
+            <div class="form-group">
+              <label for="contactName">Your Name</label>
+              <input type="text" id="contactName" name="contactName" required placeholder="John Doe">
+            </div>
+            <div class="form-group">
+              <label for="contactEmail">Email Address</label>
+              <input type="email" id="contactEmail" name="contactEmail" required placeholder="your.email@example.com">
+            </div>
+            <div class="form-group">
+              <label for="contactSubject">Subject</label>
+              <input type="text" id="contactSubject" name="contactSubject" required placeholder="What can we help you with?">
+            </div>
+            <div class="form-group">
+              <label for="contactMessage">Message</label>
+              <textarea id="contactMessage" name="contactMessage" rows="5" required placeholder="Please describe your issue or question..."></textarea>
+            </div>
+            <div id="contactSuccessMessage" class="success-message" style="display: none;">
+              <p>Thank you for contacting us! We'll get back to you as soon as possible.</p>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="primary-btn">Send Message</button>
+              <button type="button" class="ghost-btn" id="cancelContact">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-left">
+        <img src="./RunpathLabs_Logo-Combined_Reversed.png" alt="Runpath logo" class="logo small">
+        <span>Enterprise Solutions</span>
+      </div>
+      <div class="footer-right">
+        <span>© 2025 Runpath Enterprise Solutions. All rights reserved.</span>
+        <a href="contact.html">Contact</a>
+      </div>
+    </footer>
+  </div>
+  <script src="./script.js"></script>
+  <script>
+    // Handle login form submission - prevent sign in
+    document.getElementById('loginForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const errorDiv = document.getElementById('loginError');
+      errorDiv.style.display = 'block';
+      errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    // Forgot password modal
+    const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+    const forgotPasswordModal = document.getElementById('forgotPasswordModal');
+    const closeModal = document.getElementById('closeModal');
+    const cancelReset = document.getElementById('cancelReset');
+    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+    const resetSuccessMessage = document.getElementById('resetSuccessMessage');
+
+    // Open modal
+    forgotPasswordLink?.addEventListener('click', (e) => {
+      e.preventDefault();
+      forgotPasswordModal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    });
+
+    // Close modal
+    const closeModalFunc = () => {
+      forgotPasswordModal.style.display = 'none';
+      document.body.style.overflow = '';
+      resetSuccessMessage.style.display = 'none';
+      forgotPasswordForm.reset();
+    };
+
+    closeModal?.addEventListener('click', closeModalFunc);
+    cancelReset?.addEventListener('click', closeModalFunc);
+
+    // Close modal when clicking outside
+    forgotPasswordModal?.addEventListener('click', (e) => {
+      if (e.target === forgotPasswordModal) {
+        closeModalFunc();
+      }
+    });
+
+    // Handle forgot password form submission
+    forgotPasswordForm?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      resetSuccessMessage.style.display = 'block';
+      resetSuccessMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      
+      // Hide form after showing message
+      setTimeout(() => {
+        closeModalFunc();
+      }, 3000);
+    });
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && forgotPasswordModal.style.display === 'flex') {
+        closeModalFunc();
+      }
+    });
+
+    // Contact Support Modal
+    const contactSupportLink = document.getElementById('contactSupportLink');
+    const contactSupportModal = document.getElementById('contactSupportModal');
+    const closeContactModal = document.getElementById('closeContactModal');
+    const cancelContact = document.getElementById('cancelContact');
+    const contactSupportForm = document.getElementById('contactSupportForm');
+    const contactSuccessMessage = document.getElementById('contactSuccessMessage');
+
+    // Open contact support modal
+    contactSupportLink?.addEventListener('click', (e) => {
+      e.preventDefault();
+      contactSupportModal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    });
+
+    // Close contact support modal
+    const closeContactModalFunc = () => {
+      contactSupportModal.style.display = 'none';
+      document.body.style.overflow = '';
+      contactSuccessMessage.style.display = 'none';
+      contactSupportForm.reset();
+    };
+
+    closeContactModal?.addEventListener('click', closeContactModalFunc);
+    cancelContact?.addEventListener('click', closeContactModalFunc);
+
+    // Close modal when clicking outside
+    contactSupportModal?.addEventListener('click', (e) => {
+      if (e.target === contactSupportModal) {
+        closeContactModalFunc();
+      }
+    });
+
+    // Handle contact support form submission
+    contactSupportForm?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      contactSuccessMessage.style.display = 'block';
+      contactSuccessMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      
+      // Hide form after showing message
+      setTimeout(() => {
+        closeContactModalFunc();
+      }, 3000);
+    });
+
+    // Close contact modal on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && contactSupportModal.style.display === 'flex') {
+        closeContactModalFunc();
+      }
+    });
+  </script>
+</body>
+</html>
+
