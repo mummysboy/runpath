@@ -19,7 +19,42 @@ Environment variables in production point to a **different Supabase project** th
 
 **See `FIX_PRODUCTION_LOGIN.md` for detailed troubleshooting steps.**
 
-### Issue 1: Login Page Looks Completely Different (Wrong Page Being Served)
+### Issue 1: 404 "Page not found" Error on Netlify
+
+**Symptoms:**
+- Getting "Page not found" error when accessing the site URL
+- Netlify shows 404 for all routes
+- Site works locally but not on Netlify
+
+**Most Common Cause:**
+Missing or incorrect `netlify.toml` configuration file. Netlify needs to know this is a Next.js app and how to build/serve it.
+
+**Solution:**
+1. Ensure `netlify.toml` exists in the root directory with:
+   ```toml
+   [build]
+     command = "npm run build"
+
+   [[plugins]]
+     package = "@netlify/plugin-nextjs"
+
+   [build.environment]
+     NODE_VERSION = "18"
+   ```
+
+2. In Netlify Dashboard:
+   - Go to Site settings → Build & deploy → Build settings
+   - Build command: `npm run build` (should auto-detect from netlify.toml)
+   - Publish directory: Leave empty (plugin handles this)
+   - Node version: 18 (or match your local)
+
+3. **Important:** The `@netlify/plugin-nextjs` plugin will be automatically installed by Netlify. You don't need to add it to package.json.
+
+4. Redeploy your site after adding/updating `netlify.toml`
+
+**Note:** Static HTML files in root can also cause routing conflicts. They have been moved to `/legacy` folder.
+
+### Issue 2: Login Page Looks Completely Different (Wrong Page Being Served)
 
 **Symptoms:**
 - Login page looks completely different between local and production
