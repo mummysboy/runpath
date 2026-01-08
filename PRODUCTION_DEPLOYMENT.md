@@ -34,19 +34,20 @@ Missing or incorrect `netlify.toml` configuration file. Netlify needs to know th
    ```toml
    [build]
      command = "npm run build"
+     publish = ".next"
 
    [[plugins]]
      package = "@netlify/plugin-nextjs"
 
    [build.environment]
-     NODE_VERSION = "18"
+     NODE_VERSION = "20"
    ```
 
 2. In Netlify Dashboard:
    - Go to Site settings → Build & deploy → Build settings
    - Build command: `npm run build` (should auto-detect from netlify.toml)
-   - Publish directory: Leave empty (plugin handles this)
-   - Node version: 18 (or match your local)
+   - **IMPORTANT:** Publish directory: Set to `.next` (or leave empty - the plugin handles it, but UI setting must not be `/` or repo root)
+   - Node version: 20 (updated from 18 due to deprecation warnings)
 
 3. **Important:** The `@netlify/plugin-nextjs` plugin will be automatically installed by Netlify. You don't need to add it to package.json.
 
