@@ -16,3 +16,27 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Rich text content styling for ticket formatting */
+.rich-text-content span[style*="background-color"],
+.rich-text-content font[style*="background-color"],
+.rich-text-content mark {
+  background-color: rgba(254, 240, 138, 0.4) !important;
+  padding: 0 2px;
+  border-radius: 2px;
+  display: inline;
+}
+
+.rich-text-content strong,
+.rich-text-content b {
+  font-weight: 600;
+}
+
+.rich-text-content em,
+.rich-text-content i {
+  font-style: italic;
+}
+
+.rich-text-content u {
+  text-decoration: underline;
+}
+

@@ -15,15 +15,22 @@ interface Project {
   };
 }
 
+interface User {
+  user_id: string;
+  full_name: string | null;
+  email?: string;
+}
+
 interface ProjectsContentProps {
   projects: Project[];
   orgId: string;
   userId: string;
   clients: Array<{ id: string; name: string }>;
   isAdmin: boolean;
+  users: User[];
 }
 
-export default function ProjectsContent({ projects, orgId, userId, clients, isAdmin }: ProjectsContentProps) {
+export default function ProjectsContent({ projects, orgId, userId, clients, isAdmin, users }: ProjectsContentProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   return (
@@ -41,6 +48,7 @@ export default function ProjectsContent({ projects, orgId, userId, clients, isAd
               clients={clients}
               open={isFormOpen}
               onOpenChange={setIsFormOpen}
+              users={users}
             />
           )}
         </div>

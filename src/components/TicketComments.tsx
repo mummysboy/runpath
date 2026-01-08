@@ -23,20 +23,46 @@ export default function TicketComments({ ticketId, userId, isClient }: TicketCom
 
   const loadComments = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch comments first
+      const { data: commentsData, error: commentsError } = await supabase
         .from('ticket_comments')
-        .select('*, author_profile:users_profile!author_id(*)')
+        .select('*')
         .eq('ticket_id', ticketId)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (commentsError) throw commentsError;
 
-      // Clients can only see non-internal comments
-      if (isClient) {
-        setComments(data.filter((c: any) => !c.is_internal));
-      } else {
-        setComments(data || []);
+      // Filter internal comments for clients
+      const visibleComments = isClient
+        ? (commentsData || []).filter((c: any) => !c.is_internal)
+        : commentsData || [];
+
+      // Get unique author IDs
+      const authorIds = Array.from(new Set(visibleComments.map((c: any) => c.author_id)));
+
+      // Fetch user profiles separately
+      let authorProfiles: Record<string, any> = {};
+      if (authorIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('users_profile')
+          .select('user_id, full_name')
+          .in('user_id', authorIds);
+
+        if (profiles) {
+          authorProfiles = profiles.reduce((acc: Record<string, any>, p: any) => {
+            acc[p.user_id] = p;
+            return acc;
+          }, {});
+        }
       }
+
+      // Combine comments with author profiles
+      const commentsWithProfiles = visibleComments.map((comment: any) => ({
+        ...comment,
+        author_profile: authorProfiles[comment.author_id] || null,
+      }));
+
+      setComments(commentsWithProfiles);
     } catch (err: any) {
       console.error('Error loading comments:', err);
     } finally {

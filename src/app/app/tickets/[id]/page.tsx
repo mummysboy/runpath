@@ -3,11 +3,14 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import TicketComments from '@/components/TicketComments';
 import TicketStatusChange from '@/components/TicketStatusChange';
+import TicketActions from '@/components/TicketActions';
+import TicketEvidenceSection from '@/components/TicketEvidenceSection';
+import FormattedText from '@/components/FormattedText';
 
 export default async function TicketDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }> | { id: string };
 }) {
   const supabase = await createClient();
   const {
@@ -28,34 +31,70 @@ export default async function TicketDetailPage({
     redirect('/login');
   }
 
-  // Get ticket
-  const { data: ticket } = await supabase
-    .from('tickets')
-    .select('*, projects(*, clients(*)), created_by_profile:users_profile!created_by(*)')
-    .eq('id', params.id)
-    .single();
+  // Await params if it's a Promise (Next.js 15+)
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const ticketId = resolvedParams.id;
 
-  if (!ticket || ticket.org_id !== profile.org_id) {
+  // Get ticket
+  const { data: ticket, error: ticketError } = await supabase
+    .from('tickets')
+    .select('*, projects(*, clients(*))')
+    .eq('id', ticketId)
+    .single();
+  
+  // Get creator profile separately since created_by references auth.users, not users_profile directly
+  let createdByProfile = null;
+  if (ticket?.created_by) {
+    const { data: profileData } = await supabase
+      .from('users_profile')
+      .select('*')
+      .eq('user_id', ticket.created_by)
+      .single();
+    createdByProfile = profileData;
+  }
+
+  if (ticketError || !ticket || ticket.org_id !== profile.org_id) {
+    console.error('[Ticket Detail] Error fetching ticket:', ticketError);
     notFound();
   }
 
-  // Check access
+  // Check access - user can access if they created it, are a project member, or are admin
   const { data: projectMember } = await supabase
     .from('project_members')
     .select('member_role')
     .eq('project_id', ticket.project_id)
     .eq('user_id', user.id)
     .single();
+  
+  // Allow access if user created the ticket, even if not a project member
+  const isCreator = ticket.created_by === user.id;
 
   const { data: userRoles } = await supabase
     .from('user_roles')
     .select('*, roles(*)')
     .eq('user_id', user.id);
   const isAdmin = userRoles?.some((ur: any) => ur.roles?.name === 'Admin');
+  const isUX = userRoles?.some((ur: any) => ur.roles?.name === 'UX Researcher');
+  const isDev = userRoles?.some((ur: any) => ur.roles?.name === 'Developer');
   const isClient = projectMember?.member_role === 'client';
+  
+  // Check project member roles as well
+  const isProjectAdmin = projectMember?.member_role === 'admin';
+  const isProjectUX = projectMember?.member_role === 'ux';
+  const isProjectDev = projectMember?.member_role === 'dev';
+  
+  // Determine if user can see formatting (admin or UX)
+  const canSeeFormatting = isAdmin || isUX || isProjectAdmin || isProjectUX;
+  // Determine if user is developer (should see plain text and no priority badge)
+  const isDeveloper = isDev || isProjectDev;
 
-  // Clients can only see client-visible tickets
-  if (isClient && !ticket.client_visible && !isAdmin) {
+  // Allow access if user created the ticket, is a project member, or is admin
+  if (!isCreator && !projectMember && !isAdmin) {
+    redirect('/app/projects');
+  }
+
+  // Clients can only see client-visible tickets (unless they created it or are admin)
+  if (isClient && !ticket.client_visible && !isAdmin && !isCreator) {
     redirect('/app/projects');
   }
 
@@ -63,15 +102,31 @@ export default async function TicketDetailPage({
   const { data: evidence } = await supabase
     .from('ticket_evidence')
     .select('*')
-    .eq('ticket_id', params.id)
+    .eq('ticket_id', ticketId)
     .order('created_at', { ascending: false });
 
   // Get status history
   const { data: statusHistory } = await supabase
     .from('ticket_status_history')
-    .select('*, changed_by_profile:users_profile!changed_by(*)')
-    .eq('ticket_id', params.id)
+    .select('*')
+    .eq('ticket_id', ticketId)
     .order('created_at', { ascending: false });
+
+  // Get changed_by profiles separately
+  const changedByIds = statusHistory?.map((h: any) => h.changed_by).filter(Boolean) || [];
+  let changedByProfiles: Record<string, any> = {};
+  if (changedByIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('users_profile')
+      .select('*')
+      .in('user_id', changedByIds);
+    if (profiles) {
+      changedByProfiles = profiles.reduce((acc: Record<string, any>, p: any) => {
+        acc[p.user_id] = p;
+        return acc;
+      }, {});
+    }
+  }
 
   const canChangeStatus = isAdmin || projectMember?.member_role === 'dev' || projectMember?.member_role === 'admin';
 
@@ -86,18 +141,32 @@ export default async function TicketDetailPage({
         </Link>
         <div className="flex items-start justify-between mt-4">
           <div className="flex-1">
-            <h1 className="text-4xl font-bold mb-2 text-[#f7f9ff]">{ticket.title}</h1>
+            <h1 className="text-4xl font-bold mb-2 text-[#f7f9ff]">
+              <FormattedText 
+                text={ticket.title} 
+                showAsHtml={canSeeFormatting}
+                showAsPlain={isDeveloper}
+                formatting={canSeeFormatting ? (ticket.title_formatting as any) : undefined} 
+              />
+            </h1>
             <p className="text-[#b7c1cf]">
-              Project: {ticket.projects?.name} • Created by {ticket.created_by_profile?.full_name || 'Unknown'}
+              Project: {ticket.projects?.name} • Created by {createdByProfile?.full_name || 'Unknown'}
             </p>
           </div>
           <div className="flex gap-2 ml-4">
+            {ticket.archived && (
+              <span className="px-3 py-1 rounded-full text-sm font-medium bg-[rgba(250,204,21,0.15)] text-yellow-300">
+                Archived
+              </span>
+            )}
             <span className="px-3 py-1 rounded-full text-sm font-medium bg-[rgba(94,160,255,0.15)] text-[#8fc2ff]">
               {ticket.status}
             </span>
-            <span className="px-3 py-1 rounded-full text-sm font-medium bg-[rgba(255,255,255,0.05)] text-[#9eacc2]">
-              {ticket.priority}
-            </span>
+            {!isDeveloper && (
+              <span className="px-3 py-1 rounded-full text-sm font-medium bg-[rgba(255,255,255,0.05)] text-[#9eacc2]">
+                {ticket.priority}
+              </span>
+            )}
             <span className="px-3 py-1 rounded-full text-sm font-medium bg-[rgba(255,255,255,0.05)] text-[#9eacc2]">
               {ticket.type}
             </span>
@@ -109,39 +178,42 @@ export default async function TicketDetailPage({
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-xl p-6">
             <h2 className="text-xl font-semibold mb-4 text-[#f4f6fb]">Description</h2>
-            <p className="text-[#d6dbe5] whitespace-pre-wrap">{ticket.description || 'No description provided.'}</p>
+            <div className="text-[#d6dbe5] whitespace-pre-wrap">
+              {ticket.description ? (
+                <FormattedText 
+                  text={ticket.description} 
+                  showAsHtml={canSeeFormatting}
+                  showAsPlain={isDeveloper}
+                  formatting={canSeeFormatting ? (ticket.description_formatting as any) : undefined} 
+                />
+              ) : (
+                'No description provided.'
+              )}
+            </div>
           </div>
 
-          {evidence && evidence.length > 0 && (
-            <div className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-xl p-6">
-              <h2 className="text-xl font-semibold mb-4 text-[#f4f6fb]">Evidence</h2>
-              <div className="space-y-3">
-                {evidence.map((ev: any) => (
-                  <div key={ev.id} className="flex items-center gap-3 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3">
-                    <span className="text-xs px-2 py-1 rounded bg-[rgba(94,160,255,0.15)] text-[#8fc2ff]">
-                      {ev.kind}
-                    </span>
-                    <span className="flex-1 text-sm text-[#d6dbe5]">{ev.label || ev.url}</span>
-                    <a
-                      href={ev.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-[#5ea0ff] hover:text-[#8fc2ff]"
-                    >
-                      Open →
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <TicketEvidenceSection
+            ticketId={ticketId}
+            evidence={evidence || []}
+            canAdd={isCreator || isAdmin || projectMember?.member_role === 'admin' || projectMember?.member_role === 'dev' || projectMember?.member_role === 'ux'}
+            orgId={profile.org_id}
+          />
 
-          <TicketComments ticketId={params.id} userId={user.id} isClient={isClient || false} />
+          <TicketComments ticketId={ticketId} userId={user.id} isClient={isClient || false} />
         </div>
 
         <div className="space-y-6">
           {canChangeStatus && (
             <TicketStatusChange ticket={ticket} userId={user.id} />
+          )}
+
+          {(isAdmin || isProjectAdmin) && (
+            <TicketActions
+              ticketId={ticketId}
+              isArchived={ticket.archived || false}
+              isAdmin={isAdmin}
+              isProjectAdmin={isProjectAdmin}
+            />
           )}
 
           <div className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-xl p-6">
@@ -151,10 +223,12 @@ export default async function TicketDetailPage({
                 <p className="text-[#9eacc2]">Status</p>
                 <p className="text-[#f4f6fb] font-medium">{ticket.status}</p>
               </div>
-              <div>
-                <p className="text-[#9eacc2]">Priority</p>
-                <p className="text-[#f4f6fb] font-medium">{ticket.priority}</p>
-              </div>
+              {!isDeveloper && (
+                <div>
+                  <p className="text-[#9eacc2]">Priority</p>
+                  <p className="text-[#f4f6fb] font-medium">{ticket.priority}</p>
+                </div>
+              )}
               <div>
                 <p className="text-[#9eacc2]">Type</p>
                 <p className="text-[#f4f6fb] font-medium">{ticket.type}</p>
@@ -182,7 +256,7 @@ export default async function TicketDetailPage({
                       {history.from_status || 'Created'} → {history.to_status}
                     </p>
                     <p className="text-xs text-[#9eacc2] mt-1">
-                      by {history.changed_by_profile?.full_name || 'Unknown'} • {new Date(history.created_at).toLocaleString()}
+                      by {changedByProfiles[history.changed_by]?.full_name || 'Unknown'} • {new Date(history.created_at).toLocaleString()}
                     </p>
                     {history.note && (
                       <p className="text-xs text-[#7a8799] mt-1 italic">{history.note}</p>

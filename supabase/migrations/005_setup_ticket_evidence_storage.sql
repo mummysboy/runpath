@@ -1,0 +1,49 @@
+-- Storage policies for ticket-evidence bucket
+-- 
+-- NOTE: Storage policies cannot be created via SQL migrations in Supabase.
+-- You must create them manually in the Supabase Dashboard.
+--
+-- Follow these steps:
+--
+-- 1. Create the bucket:
+--    - Go to Storage > New bucket
+--    - Name: ticket-evidence
+--    - Public bucket: ✅ (checked)
+--    - File size limit: 10MB (recommended)
+--    - Allowed MIME types: image/* (recommended)
+--    - Click "Create bucket"
+--
+-- 2. Create storage policies in the Dashboard:
+--    - Go to Storage > Policies
+--    - Select the "ticket-evidence" bucket
+--    - Click "New Policy"
+--
+--    Policy 1: "Authenticated users can upload ticket evidence"
+--    - Policy name: Authenticated users can upload ticket evidence
+--    - Allowed operation: INSERT
+--    - Target roles: authenticated
+--    - Policy definition (USING expression): Leave empty
+--    - Policy definition (WITH CHECK expression):
+--      bucket_id = 'ticket-evidence' AND (
+--        (storage.foldername(name))[1] = 'temp' OR
+--        (storage.foldername(name))[1] = 'tickets'
+--      )
+--
+--    Policy 2: "Authenticated users can read ticket evidence"
+--    - Policy name: Authenticated users can read ticket evidence
+--    - Allowed operation: SELECT
+--    - Target roles: authenticated
+--    - Policy definition (USING expression):
+--      bucket_id = 'ticket-evidence'
+--    - Policy definition (WITH CHECK expression): Leave empty
+--
+--    Policy 3: "Users can delete ticket evidence"
+--    - Policy name: Users can delete ticket evidence
+--    - Allowed operation: DELETE
+--    - Target roles: authenticated
+--    - Policy definition (USING expression):
+--      bucket_id = 'ticket-evidence'
+--    - Policy definition (WITH CHECK expression): Leave empty
+--
+-- Alternatively, you can use the Supabase CLI or API to create these policies.
+-- This migration file serves as documentation of the required policies.

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+import ImageUpload from '@/components/ImageUpload';
+import RichTextEditor from '@/components/RichTextEditor';
 
 export default function NewTicketPage() {
   const router = useRouter();
@@ -13,6 +15,7 @@ export default function NewTicketPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAdminOrUX, setIsAdminOrUX] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -20,8 +23,47 @@ export default function NewTicketPage() {
     type: 'bug' as 'bug' | 'feature' | 'improvement' | 'question',
     client_visible: true,
   });
+  const [titleHtml, setTitleHtml] = useState('');
+  const [titleFormatting, setTitleFormatting] = useState<any>({});
+  const [descriptionHtml, setDescriptionHtml] = useState('');
+  const [descriptionFormatting, setDescriptionFormatting] = useState<any>({});
   const [evidence, setEvidence] = useState<Array<{ kind: 'link' | 'file'; url: string; label: string }>>([]);
   const [newEvidence, setNewEvidence] = useState({ kind: 'link' as 'link' | 'file', url: '', label: '' });
+
+  // Check if user is admin or UX writer
+  useEffect(() => {
+    async function checkUserRole() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      // Check user roles
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('*, roles(*)')
+        .eq('user_id', user.id);
+
+      const isAdmin = userRoles?.some((ur: any) => ur.roles?.name === 'Admin');
+      const isUX = userRoles?.some((ur: any) => ur.roles?.name === 'UX Researcher');
+
+      // Also check project member role
+      const { data: projectMember } = await supabase
+        .from('project_members')
+        .select('member_role')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .single();
+
+      const isProjectAdmin = projectMember?.member_role === 'admin';
+      const isProjectUX = projectMember?.member_role === 'ux';
+
+      setIsAdminOrUX(isAdmin || isUX || isProjectAdmin || isProjectUX);
+    }
+
+    checkUserRole();
+  }, [projectId, supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,27 +89,94 @@ export default function NewTicketPage() {
         throw new Error('Profile not found');
       }
 
+      // Prepare formatting data (only if admin or UX)
+      // For admins/UX: use HTML content, for others: use plain text
+      const finalTitle = isAdminOrUX && titleHtml ? titleHtml : formData.title;
+      const finalDescription = isAdminOrUX && descriptionHtml ? descriptionHtml : formData.description;
+      const titleFormattingData = isAdminOrUX ? titleFormatting : {};
+      const descriptionFormattingData = isAdminOrUX ? descriptionFormatting : {};
+
+      // Build insert object - only include formatting fields if they have content
+      const insertData: any = {
+        org_id: profile.org_id,
+        project_id: projectId,
+        created_by: user.id,
+        title: finalTitle,
+        description: finalDescription,
+        priority: formData.priority,
+        type: formData.type,
+        client_visible: formData.client_visible,
+        status: 'open',
+        archived: false, // Explicitly set archived to false
+      };
+
+      // Only add formatting fields if they have values (and columns exist)
+      // This prevents errors if migration hasn't been run yet
+      if (isAdminOrUX && (Object.keys(titleFormattingData).length > 0 || Object.keys(descriptionFormattingData).length > 0)) {
+        // Try to include formatting, but catch error if columns don't exist
+        insertData.title_formatting = titleFormattingData;
+        insertData.description_formatting = descriptionFormattingData;
+      }
+
       // Create ticket
       const { data: ticket, error: ticketError } = await supabase
         .from('tickets')
-        .insert({
-          org_id: profile.org_id,
-          project_id: projectId,
-          created_by: user.id,
-          title: formData.title,
-          description: formData.description,
-          priority: formData.priority,
-          type: formData.type,
-          client_visible: formData.client_visible,
-          status: 'open',
-        })
-        .select()
+        .insert(insertData)
+        .select('id, org_id, project_id, created_by, title, description, priority, status, type, client_visible, archived, created_at, updated_at')
         .single();
 
-      if (ticketError) throw ticketError;
+      if (ticketError) {
+        // If error is about missing columns, try again without formatting fields
+        if (ticketError.message?.includes('description_formatting') || ticketError.message?.includes('title_formatting')) {
+          delete insertData.title_formatting;
+          delete insertData.description_formatting;
+          const { data: retryTicket, error: retryError } = await supabase
+            .from('tickets')
+            .insert(insertData)
+            .select('id, org_id, project_id, created_by, title, description, priority, status, type, client_visible, archived, created_at, updated_at')
+            .single();
+          if (retryError) throw retryError;
+          if (!retryTicket) throw new Error('Failed to create ticket');
+          // Use retryTicket for the rest
+          const finalTicket = retryTicket;
+          
+          // Create evidence links
+          if (evidence.length > 0) {
+            const evidenceData = evidence.map((ev) => ({
+              ticket_id: finalTicket.id,
+              kind: ev.kind,
+              url: ev.url,
+              label: ev.label,
+            }));
+
+            const { error: evidenceError } = await supabase
+              .from('ticket_evidence')
+              .insert(evidenceData);
+
+            if (evidenceError) throw evidenceError;
+          }
+
+          // Create initial status history
+          await supabase.from('ticket_status_history').insert({
+            ticket_id: finalTicket.id,
+            changed_by: user.id,
+            from_status: null,
+            to_status: 'open',
+            note: 'Ticket created',
+          });
+
+          router.push(`/app/tickets/${finalTicket.id}`);
+          return;
+        }
+        throw ticketError;
+      }
+
+      if (!ticket) {
+        throw new Error('Failed to create ticket');
+      }
 
       // Create evidence links
-      if (evidence.length > 0 && ticket) {
+      if (evidence.length > 0) {
         const evidenceData = evidence.map((ev) => ({
           ticket_id: ticket.id,
           kind: ev.kind,
@@ -83,15 +192,13 @@ export default function NewTicketPage() {
       }
 
       // Create initial status history
-      if (ticket) {
-        await supabase.from('ticket_status_history').insert({
-          ticket_id: ticket.id,
-          changed_by: user.id,
-          from_status: null,
-          to_status: 'open',
-          note: 'Ticket created',
-        });
-      }
+      await supabase.from('ticket_status_history').insert({
+        ticket_id: ticket.id,
+        changed_by: user.id,
+        from_status: null,
+        to_status: 'open',
+        note: 'Ticket created',
+      });
 
       router.push(`/app/tickets/${ticket.id}`);
     } catch (err: any) {
@@ -106,6 +213,14 @@ export default function NewTicketPage() {
       setEvidence([...evidence, newEvidence]);
       setNewEvidence({ kind: 'link', url: '', label: '' });
     }
+  };
+
+  const handleImageUpload = (url: string, fileName: string) => {
+    setEvidence([...evidence, {
+      kind: 'file',
+      url: url,
+      label: fileName,
+    }]);
   };
 
   const removeEvidence = (index: number) => {
@@ -136,29 +251,61 @@ export default function NewTicketPage() {
           <label htmlFor="title" className="block text-sm font-medium mb-2 text-[#d6dbe5]">
             Title *
           </label>
-          <input
-            id="title"
-            type="text"
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            required
-            className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#f4f6fb] placeholder:text-[#7a8799] focus:outline-none focus:border-[rgba(94,160,255,0.5)] focus:bg-[rgba(255,255,255,0.07)]"
-            placeholder="Brief description of the ticket"
-          />
+          {isAdminOrUX ? (
+            <RichTextEditor
+              value={titleHtml}
+              onChange={(html, formatting) => {
+                setTitleHtml(html);
+                setTitleFormatting(formatting);
+                // Also update formData for validation
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                setFormData({ ...formData, title: tempDiv.textContent || '' });
+              }}
+              placeholder="Brief description of the ticket"
+              disabled={loading}
+            />
+          ) : (
+            <input
+              id="title"
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              required
+              className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#f4f6fb] placeholder:text-[#7a8799] focus:outline-none focus:border-[rgba(94,160,255,0.5)] focus:bg-[rgba(255,255,255,0.07)]"
+              placeholder="Brief description of the ticket"
+            />
+          )}
         </div>
 
         <div>
           <label htmlFor="description" className="block text-sm font-medium mb-2 text-[#d6dbe5]">
             Description
           </label>
-          <textarea
-            id="description"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            rows={6}
-            className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#f4f6fb] placeholder:text-[#7a8799] focus:outline-none focus:border-[rgba(94,160,255,0.5)] focus:bg-[rgba(255,255,255,0.07)]"
-            placeholder="Detailed description of the issue or request"
-          />
+          {isAdminOrUX ? (
+            <RichTextEditor
+              value={descriptionHtml}
+              onChange={(html, formatting) => {
+                setDescriptionHtml(html);
+                setDescriptionFormatting(formatting);
+                // Also update formData
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                setFormData({ ...formData, description: tempDiv.textContent || '' });
+              }}
+              placeholder="Detailed description of the issue or request"
+              disabled={loading}
+            />
+          ) : (
+            <textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={6}
+              className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#f4f6fb] placeholder:text-[#7a8799] focus:outline-none focus:border-[rgba(94,160,255,0.5)] focus:bg-[rgba(255,255,255,0.07)]"
+              placeholder="Detailed description of the issue or request"
+            />
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -172,10 +319,20 @@ export default function NewTicketPage() {
               onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
               className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#f4f6fb] focus:outline-none focus:border-[rgba(94,160,255,0.5)] focus:bg-[rgba(255,255,255,0.07)]"
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
+              {isAdminOrUX ? (
+                <>
+                  <option value="high">High</option>
+                  <option value="medium">Med</option>
+                  <option value="low">Low</option>
+                </>
+              ) : (
+                <>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </>
+              )}
             </select>
           </div>
 
@@ -197,6 +354,7 @@ export default function NewTicketPage() {
           </div>
         </div>
 
+
         <div>
           <label className="flex items-center gap-3 cursor-pointer">
             <input
@@ -214,10 +372,28 @@ export default function NewTicketPage() {
           <div className="space-y-3">
             {evidence.map((ev, index) => (
               <div key={index} className="flex items-center gap-3 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3">
-                <span className="text-xs px-2 py-1 rounded bg-[rgba(94,160,255,0.15)] text-[#8fc2ff]">
-                  {ev.kind}
-                </span>
-                <span className="flex-1 text-sm text-[#d6dbe5]">{ev.label}</span>
+                {ev.kind === 'file' && ev.url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                  <div className="flex items-center gap-3 flex-1">
+                    <img
+                      src={ev.url}
+                      alt={ev.label}
+                      className="w-16 h-16 object-cover rounded border border-[rgba(255,255,255,0.1)]"
+                    />
+                    <div className="flex-1">
+                      <span className="text-xs px-2 py-1 rounded bg-[rgba(94,160,255,0.15)] text-[#8fc2ff] mb-1 inline-block">
+                        Image
+                      </span>
+                      <p className="text-sm text-[#d6dbe5] mt-1">{ev.label}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-xs px-2 py-1 rounded bg-[rgba(94,160,255,0.15)] text-[#8fc2ff]">
+                      {ev.kind}
+                    </span>
+                    <span className="flex-1 text-sm text-[#d6dbe5]">{ev.label}</span>
+                  </>
+                )}
                 <a
                   href={ev.url}
                   target="_blank"
@@ -235,36 +411,45 @@ export default function NewTicketPage() {
                 </button>
               </div>
             ))}
-            <div className="flex gap-3">
-              <select
-                value={newEvidence.kind}
-                onChange={(e) => setNewEvidence({ ...newEvidence, kind: e.target.value as 'link' | 'file' })}
-                className="px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#f4f6fb] text-sm focus:outline-none focus:border-[rgba(94,160,255,0.5)]"
-              >
-                <option value="link">Link</option>
-                <option value="file">File</option>
-              </select>
-              <input
-                type="text"
-                value={newEvidence.label}
-                onChange={(e) => setNewEvidence({ ...newEvidence, label: e.target.value })}
-                placeholder="Label"
-                className="flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#f4f6fb] placeholder:text-[#7a8799] text-sm focus:outline-none focus:border-[rgba(94,160,255,0.5)]"
+            
+            <div className="space-y-3">
+              <ImageUpload
+                onUploadComplete={handleImageUpload}
+                disabled={loading}
               />
-              <input
-                type="url"
-                value={newEvidence.url}
-                onChange={(e) => setNewEvidence({ ...newEvidence, url: e.target.value })}
-                placeholder="URL"
-                className="flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#f4f6fb] placeholder:text-[#7a8799] text-sm focus:outline-none focus:border-[rgba(94,160,255,0.5)]"
-              />
-              <button
-                type="button"
-                onClick={addEvidence}
-                className="px-4 py-2 bg-[rgba(94,160,255,0.15)] border border-[rgba(94,160,255,0.3)] rounded-lg text-[#8fc2ff] text-sm hover:bg-[rgba(94,160,255,0.2)] transition"
-              >
-                Add
-              </button>
+              
+              <div className="flex gap-3">
+                <select
+                  value={newEvidence.kind}
+                  onChange={(e) => setNewEvidence({ ...newEvidence, kind: e.target.value as 'link' | 'file' })}
+                  className="px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#f4f6fb] text-sm focus:outline-none focus:border-[rgba(94,160,255,0.5)]"
+                >
+                  <option value="link">Link</option>
+                  <option value="file">File URL</option>
+                </select>
+                <input
+                  type="text"
+                  value={newEvidence.label}
+                  onChange={(e) => setNewEvidence({ ...newEvidence, label: e.target.value })}
+                  placeholder="Label"
+                  className="flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#f4f6fb] placeholder:text-[#7a8799] text-sm focus:outline-none focus:border-[rgba(94,160,255,0.5)]"
+                />
+                <input
+                  type="url"
+                  value={newEvidence.url}
+                  onChange={(e) => setNewEvidence({ ...newEvidence, url: e.target.value })}
+                  placeholder="URL"
+                  className="flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#f4f6fb] placeholder:text-[#7a8799] text-sm focus:outline-none focus:border-[rgba(94,160,255,0.5)]"
+                />
+                <button
+                  type="button"
+                  onClick={addEvidence}
+                  disabled={loading}
+                  className="px-4 py-2 bg-[rgba(94,160,255,0.15)] border border-[rgba(94,160,255,0.3)] rounded-lg text-[#8fc2ff] text-sm hover:bg-[rgba(94,160,255,0.2)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add
+                </button>
+              </div>
             </div>
           </div>
         </div>

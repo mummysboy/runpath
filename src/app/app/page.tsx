@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import FormattedText from '@/components/FormattedText';
 
 export default async function AppDashboard() {
   const supabase = await createClient();
@@ -33,6 +34,20 @@ export default async function AppDashboard() {
   const isUX = userRoles?.some((ur: any) => ur.roles?.name === 'UX Researcher');
   const isDev = userRoles?.some((ur: any) => ur.roles?.name === 'Developer');
   const isClient = userRoles?.some((ur: any) => ur.roles?.name === 'Client');
+  
+  const canSeeFormatting = isAdmin || isUX;
+  const isDeveloper = isDev;
+
+  // Helper function to get priority order for sorting
+  const getPriorityOrder = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 4;
+      case 'high': return 3;
+      case 'medium': return 2;
+      case 'low': return 1;
+      default: return 0;
+    }
+  };
 
   // Get projects user has access to
   const { data: projects } = await supabase
@@ -40,11 +55,12 @@ export default async function AppDashboard() {
     .select('*, projects(*, clients(*))')
     .eq('user_id', user.id);
 
-  // Get tickets based on role
+  // Get tickets based on role (exclude archived)
   let ticketsQuery = supabase
     .from('tickets')
-    .select('*, projects(*, clients(*)), created_by_profile:users_profile!created_by(*)')
+    .select('*, projects(*, clients(*))')
     .eq('org_id', profile.org_id)
+    .eq('archived', false) // Exclude archived tickets
     .order('created_at', { ascending: false })
     .limit(10);
 
@@ -53,6 +69,27 @@ export default async function AppDashboard() {
   }
 
   const { data: recentTickets } = await ticketsQuery;
+
+  // Sort tickets by priority (highest to lowest)
+  const sortedTickets = recentTickets ? [...recentTickets].sort((a: any, b: any) => {
+    return getPriorityOrder(b.priority) - getPriorityOrder(a.priority);
+  }) : [];
+
+  // Get creator profiles separately
+  const creatorIds = recentTickets?.map((t: any) => t.created_by).filter(Boolean) || [];
+  let creatorProfiles: Record<string, any> = {};
+  if (creatorIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('users_profile')
+      .select('*')
+      .in('user_id', creatorIds);
+    if (profiles) {
+      creatorProfiles = profiles.reduce((acc: Record<string, any>, p: any) => {
+        acc[p.user_id] = p;
+        return acc;
+      }, {});
+    }
+  }
 
   return (
     <div className="p-8">
@@ -138,8 +175,8 @@ export default async function AppDashboard() {
             )}
           </div>
           <div className="space-y-3">
-            {recentTickets && recentTickets.length > 0 ? (
-              recentTickets.map((ticket: any) => (
+            {sortedTickets && sortedTickets.length > 0 ? (
+              sortedTickets.map((ticket: any) => (
                 <Link
                   key={ticket.id}
                   href={`/app/tickets/${ticket.id}`}
@@ -147,14 +184,27 @@ export default async function AppDashboard() {
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h4 className="font-medium text-[#f4f6fb] mb-1">{ticket.title}</h4>
+                      <h4 className="font-medium text-[#f4f6fb] mb-1">
+                        <FormattedText 
+                          text={ticket.title} 
+                          showAsPlain={isDeveloper}
+                          formatting={canSeeFormatting ? (ticket.title_formatting as any) : undefined} 
+                        />
+                      </h4>
                       <p className="text-sm text-[#9eacc2]">
-                        {ticket.projects?.name} • {ticket.created_by_profile?.full_name || 'Unknown'}
+                        {ticket.projects?.name} • {creatorProfiles[ticket.created_by]?.full_name || 'Unknown'}
                       </p>
                     </div>
-                    <span className="ml-4 px-3 py-1 rounded-full text-xs font-medium bg-[rgba(94,160,255,0.15)] text-[#8fc2ff]">
-                      {ticket.status}
-                    </span>
+                    <div className="ml-4 flex gap-2">
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(94,160,255,0.15)] text-[#8fc2ff]">
+                        {ticket.status}
+                      </span>
+                      {!isDeveloper && (
+                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(255,255,255,0.05)] text-[#9eacc2]">
+                          {ticket.priority}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </Link>
               ))

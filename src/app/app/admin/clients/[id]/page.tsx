@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
+import ClientProjectsSection from './ClientProjectsSection';
+import ClientActions from '@/components/ClientActions';
 
 export default async function ClientDetailPage({
   params,
@@ -77,6 +80,41 @@ export default async function ClientDetailPage({
   // Calculate total tickets
   const totalTickets = Object.values(ticketCounts).reduce((sum, count) => sum + count, 0);
 
+  // Get clients list for the form
+  const { data: clientsData } = await supabase
+    .from('clients')
+    .select('id, name')
+    .eq('org_id', profile.org_id)
+    .order('name', { ascending: true });
+
+  const clients = clientsData || [];
+
+  // Get users for member assignment
+  const { data: orgUsers } = await supabase
+    .from('users_profile')
+    .select('user_id, full_name')
+    .eq('org_id', profile.org_id)
+    .order('full_name', { ascending: true });
+
+  // Fetch emails for users using admin client
+  const adminClient = createAdminClient();
+  const users = await Promise.all(
+    (orgUsers || []).map(async (userProfile: any) => {
+      try {
+        const { data: authUser } = await adminClient.auth.admin.getUserById(userProfile.user_id);
+        return {
+          ...userProfile,
+          email: authUser?.user?.email || undefined,
+        };
+      } catch {
+        return {
+          ...userProfile,
+          email: undefined,
+        };
+      }
+    })
+  );
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -101,49 +139,15 @@ export default async function ClientDetailPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div>
-            <h2 className="text-2xl font-semibold mb-4 text-[#f4f6fb]">Projects</h2>
-            <div className="space-y-3">
-              {projects && projects.length > 0 ? (
-                projects.map((project: any) => (
-                  <Link
-                    key={project.id}
-                    href={`/app/projects/${project.id}`}
-                    className="block bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-4 hover:border-[rgba(94,160,255,0.2)] transition"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-[#f4f6fb] mb-1">{project.name}</h4>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-[#9eacc2]">
-                          <span>Tickets: {ticketCounts[project.id] || 0}</span>
-                          {project.start_date && (
-                            <span>
-                              Started: {new Date(project.start_date).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="ml-4">
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(94,160,255,0.15)] text-[#8fc2ff] whitespace-nowrap">
-                          {project.status}
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                ))
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-[#9eacc2] mb-4">No projects yet</p>
-                  <Link
-                    href="/app/projects"
-                    className="text-[#5ea0ff] hover:text-[#8fc2ff] text-sm"
-                  >
-                    Create a project →
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
+          <ClientProjectsSection
+            projects={projects || []}
+            ticketCounts={ticketCounts}
+            clientId={params.id}
+            orgId={profile.org_id}
+            userId={user.id}
+            clients={clients}
+            users={users}
+          />
         </div>
 
         <div className="space-y-6">
@@ -186,6 +190,9 @@ export default async function ClientDetailPage({
               </div>
             </div>
           </div>
+
+          {/* Client Actions */}
+          <ClientActions clientId={params.id} isAdmin={isAdmin} />
         </div>
       </div>
     </div>

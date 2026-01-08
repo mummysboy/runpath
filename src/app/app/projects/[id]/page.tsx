@@ -1,7 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Calendar, Ticket, FileText, Users, AlertCircle, Clock } from 'lucide-react';
+import ManageProjectMembers from '../ManageProjectMembers';
+import ProjectActions from '@/components/ProjectActions';
+import FormattedText from '@/components/FormattedText';
 
 export default async function ProjectDetailPage({
   params,
@@ -221,11 +225,33 @@ export default async function ProjectDetailPage({
   const userMemberRole = projectMembership?.member_role || 
     project.project_members?.find((pm: any) => pm.user_id === user.id)?.member_role;
 
-  // Get tickets for this project
+  // Check user roles for formatting visibility (reuse existing userRoles and isAdmin)
+  const isUX = userRoles?.some((ur: any) => ur.roles?.name === 'UX Researcher');
+  const isDev = userRoles?.some((ur: any) => ur.roles?.name === 'Developer');
+  const isProjectAdmin = userMemberRole === 'admin';
+  const isProjectUX = userMemberRole === 'ux';
+  const isProjectDev = userMemberRole === 'dev';
+  
+  const canSeeFormatting = isAdmin || isUX || isProjectAdmin || isProjectUX;
+  const isDeveloper = isDev || isProjectDev;
+
+  // Helper function to get priority order for sorting
+  const getPriorityOrder = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 4;
+      case 'high': return 3;
+      case 'medium': return 2;
+      case 'low': return 1;
+      default: return 0;
+    }
+  };
+
+  // Get tickets for this project (exclude archived)
   let ticketsQuery = supabase
     .from('tickets')
-    .select('*, created_by_profile:users_profile!created_by(*)')
+    .select('*')
     .eq('project_id', projectId)
+    .eq('archived', false) // Exclude archived tickets
     .order('created_at', { ascending: false });
 
   if (userMemberRole === 'client') {
@@ -233,6 +259,22 @@ export default async function ProjectDetailPage({
   }
 
   const { data: tickets, error: ticketsError } = await ticketsQuery;
+
+  // Get creator profiles separately
+  const creatorIds = tickets?.map((t: any) => t.created_by).filter(Boolean) || [];
+  let creatorProfiles: Record<string, any> = {};
+  if (creatorIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('users_profile')
+      .select('*')
+      .in('user_id', creatorIds);
+    if (profiles) {
+      creatorProfiles = profiles.reduce((acc: Record<string, any>, p: any) => {
+        acc[p.user_id] = p;
+        return acc;
+      }, {});
+    }
+  }
 
   if (ticketsError) {
     console.error('[Project Detail] Error fetching tickets:', ticketsError);
@@ -270,12 +312,17 @@ export default async function ProjectDetailPage({
     }
   }
 
-  // Organize tickets by status
+  // Sort tickets by priority (highest to lowest)
+  const sortedTickets = tickets ? [...tickets].sort((a: any, b: any) => {
+    return getPriorityOrder(b.priority) - getPriorityOrder(a.priority);
+  }) : [];
+
+  // Organize tickets by status (already sorted by priority)
   const ticketsByStatus = {
-    open: tickets?.filter((t: any) => t.status === 'open') || [],
-    in_progress: tickets?.filter((t: any) => t.status === 'in_progress') || [],
-    resolved: tickets?.filter((t: any) => t.status === 'resolved') || [],
-    closed: tickets?.filter((t: any) => t.status === 'closed') || [],
+    open: sortedTickets.filter((t: any) => t.status === 'open'),
+    in_progress: sortedTickets.filter((t: any) => t.status === 'in_progress'),
+    resolved: sortedTickets.filter((t: any) => t.status === 'resolved'),
+    closed: sortedTickets.filter((t: any) => t.status === 'closed'),
   };
 
   // Calculate upcoming deadlines
@@ -305,6 +352,37 @@ export default async function ProjectDetailPage({
   };
 
   const canCreateTicket = isAdmin || userMemberRole === 'admin' || userMemberRole === 'dev' || userMemberRole === 'ux';
+
+  // Fetch available users for member management (admin only)
+  let availableUsers: Array<{ user_id: string; full_name: string | null; email?: string }> = [];
+  if (isAdmin) {
+    const { data: orgUsers } = await supabase
+      .from('users_profile')
+      .select('user_id, full_name')
+      .eq('org_id', profile.org_id)
+      .order('full_name', { ascending: true });
+
+    // Fetch emails for users using admin client
+    if (orgUsers && orgUsers.length > 0) {
+      const adminClient = createAdminClient();
+      availableUsers = await Promise.all(
+        orgUsers.map(async (userProfile: any) => {
+          try {
+            const { data: authUser } = await adminClient.auth.admin.getUserById(userProfile.user_id);
+            return {
+              ...userProfile,
+              email: authUser?.user?.email || undefined,
+            };
+          } catch {
+            return {
+              ...userProfile,
+              email: undefined,
+            };
+          }
+        })
+      );
+    }
+  }
 
   return (
     <div className="p-8">
@@ -407,19 +485,33 @@ export default async function ProjectDetailPage({
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h4 className="font-medium text-[#f4f6fb] mb-1">{ticket.title}</h4>
-                          <p className="text-sm text-[#9eacc2] line-clamp-2">{ticket.description}</p>
+                          <h4 className="font-medium text-[#f4f6fb] mb-1">
+                            <FormattedText 
+                              text={ticket.title} 
+                              showAsPlain={isDeveloper}
+                              formatting={canSeeFormatting ? (ticket.title_formatting as any) : undefined} 
+                            />
+                          </h4>
+                          <p className="text-sm text-[#9eacc2] line-clamp-2">
+                            <FormattedText 
+                              text={ticket.description || ''} 
+                              showAsPlain={isDeveloper}
+                              formatting={canSeeFormatting ? (ticket.description_formatting as any) : undefined} 
+                            />
+                          </p>
                           <p className="text-xs text-[#7a8799] mt-2">
-                            Created by {ticket.created_by_profile?.full_name || 'Unknown'} • {new Date(ticket.created_at).toLocaleDateString()}
+                            Created by {creatorProfiles[ticket.created_by]?.full_name || 'Unknown'} • {new Date(ticket.created_at).toLocaleDateString()}
                           </p>
                         </div>
                         <div className="ml-4 flex flex-col gap-2">
                           <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(239,68,68,0.2)] text-red-300 whitespace-nowrap">
                             {ticket.status}
                           </span>
-                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(255,255,255,0.05)] text-[#9eacc2] whitespace-nowrap">
-                            {ticket.priority}
-                          </span>
+                          {!isDeveloper && (
+                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(255,255,255,0.05)] text-[#9eacc2] whitespace-nowrap">
+                              {ticket.priority}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </Link>
@@ -441,19 +533,33 @@ export default async function ProjectDetailPage({
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h4 className="font-medium text-[#f4f6fb] mb-1">{ticket.title}</h4>
-                          <p className="text-sm text-[#9eacc2] line-clamp-2">{ticket.description}</p>
+                          <h4 className="font-medium text-[#f4f6fb] mb-1">
+                            <FormattedText 
+                              text={ticket.title} 
+                              showAsPlain={isDeveloper}
+                              formatting={canSeeFormatting ? (ticket.title_formatting as any) : undefined} 
+                            />
+                          </h4>
+                          <p className="text-sm text-[#9eacc2] line-clamp-2">
+                            <FormattedText 
+                              text={ticket.description || ''} 
+                              showAsPlain={isDeveloper}
+                              formatting={canSeeFormatting ? (ticket.description_formatting as any) : undefined} 
+                            />
+                          </p>
                           <p className="text-xs text-[#7a8799] mt-2">
-                            Created by {ticket.created_by_profile?.full_name || 'Unknown'} • {new Date(ticket.created_at).toLocaleDateString()}
+                            Created by {creatorProfiles[ticket.created_by]?.full_name || 'Unknown'} • {new Date(ticket.created_at).toLocaleDateString()}
                           </p>
                         </div>
                         <div className="ml-4 flex flex-col gap-2">
                           <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(250,204,21,0.2)] text-yellow-300 whitespace-nowrap">
                             {ticket.status}
                           </span>
-                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(255,255,255,0.05)] text-[#9eacc2] whitespace-nowrap">
-                            {ticket.priority}
-                          </span>
+                          {!isDeveloper && (
+                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(255,255,255,0.05)] text-[#9eacc2] whitespace-nowrap">
+                              {ticket.priority}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </Link>
@@ -477,7 +583,13 @@ export default async function ProjectDetailPage({
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h4 className="font-medium text-[#f4f6fb] mb-1">{ticket.title}</h4>
+                          <h4 className="font-medium text-[#f4f6fb] mb-1">
+                            <FormattedText 
+                              text={ticket.title} 
+                              showAsPlain={isDeveloper}
+                              formatting={canSeeFormatting ? (ticket.title_formatting as any) : undefined} 
+                            />
+                          </h4>
                           <p className="text-xs text-[#7a8799] mt-2">
                             {new Date(ticket.updated_at).toLocaleDateString()}
                           </p>
@@ -639,24 +751,38 @@ export default async function ProjectDetailPage({
           </div>
 
           {/* Team Members */}
-          <div className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-xl p-6">
-            <h3 className="font-semibold text-[#f4f6fb] mb-4 flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Team Members
-            </h3>
-            <div className="space-y-2">
-              {project.project_members?.map((member: any) => (
-                <div key={member.id} className="flex items-center justify-between">
-                  <span className="text-sm text-[#d6dbe5]">
-                    {member.users_profile?.full_name || 'Unknown'}
-                  </span>
-                  <span className="text-xs px-2 py-1 rounded bg-[rgba(255,255,255,0.05)] text-[#9eacc2] capitalize">
-                    {member.member_role}
-                  </span>
-                </div>
-              ))}
+          {isAdmin ? (
+            <ManageProjectMembers
+              projectId={projectId}
+              orgId={profile.org_id}
+              currentMembers={project.project_members || []}
+              availableUsers={availableUsers}
+            />
+          ) : (
+            <div className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-xl p-6">
+              <h3 className="font-semibold text-[#f4f6fb] mb-4 flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Team Members
+              </h3>
+              <div className="space-y-2">
+                {project.project_members?.map((member: any) => (
+                  <div key={member.id} className="flex items-center justify-between">
+                    <span className="text-sm text-[#d6dbe5]">
+                      {member.users_profile?.full_name || 'Unknown'}
+                    </span>
+                    <span className="text-xs px-2 py-1 rounded bg-[rgba(255,255,255,0.05)] text-[#9eacc2] capitalize">
+                      {member.member_role}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Project Actions */}
+          {isAdmin && (
+            <ProjectActions projectId={projectId} isAdmin={isAdmin} />
+          )}
         </div>
       </div>
     </div>

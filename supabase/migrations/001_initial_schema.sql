@@ -373,14 +373,13 @@ CREATE POLICY "Admins and project members can manage projects"
   );
 
 -- Project members: View if member or org member
+-- NOTE: Only check org membership to avoid circular dependency
+-- Users can see members of any project in their org
 CREATE POLICY "Users can view project members"
   ON project_members FOR SELECT
   USING (
     project_id IN (
       SELECT id FROM projects WHERE org_id = current_org_id()
-    )
-    OR project_id IN (
-      SELECT project_id FROM project_members WHERE user_id = auth.uid()
     )
   );
 
