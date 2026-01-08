@@ -19,7 +19,24 @@ Environment variables in production point to a **different Supabase project** th
 
 **See `FIX_PRODUCTION_LOGIN.md` for detailed troubleshooting steps.**
 
-### Issue 1: Login Page Looks Different (Styling Issues)
+### Issue 1: Login Page Looks Completely Different (Wrong Page Being Served)
+
+**Symptoms:**
+- Login page looks completely different between local and production
+- Production shows old marketing-style login page instead of modern dark theme
+- Production login page doesn't have Supabase authentication
+
+**Most Common Cause:**
+Static HTML files in the root directory (`login.html`, `index.html`, etc.) are being served by the hosting platform instead of Next.js routes. These are legacy files from before the app was converted to Next.js.
+
+**Solution:**
+Static HTML files have been moved to `/legacy` folder. If you still see the old login page:
+1. Ensure your hosting platform is configured to use Next.js (not static file serving)
+2. Verify the build command is `npm run build`
+3. Check that static files in root don't override Next.js routes
+4. Clear your browser cache and try again
+
+### Issue 2: Login Page Looks Different (Styling Issues)
 
 **Symptoms:**
 - Login page appears unstyled or with different appearance in production
@@ -54,7 +71,7 @@ Environment variables in production point to a **different Supabase project** th
    - Check the `.next` folder after build
    - Look for CSS files in `.next/static/css/`
 
-### Issue 2: Cannot Login in Production
+### Issue 3: Cannot Login in Production
 
 **Symptoms:**
 - Login works locally but fails in production
