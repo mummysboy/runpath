@@ -30,6 +30,25 @@ export default function LoginPage() {
     } else if (errorParam === 'profile_error') {
       setError('Error loading your profile. This might be an RLS (Row Level Security) issue. Please check the server console and run fix_rls_circular_dependency.sql in Supabase SQL Editor.');
     }
+    
+    // Debug: Check environment variables in production (only log, don't expose values)
+    if (typeof window !== 'undefined') {
+      const hasUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const hasKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+      
+      if (isProduction) {
+        console.log('[Login Debug] Environment check:', {
+          hasSupabaseUrl: hasUrl,
+          hasSupabaseKey: hasKey,
+          hostname: window.location.hostname,
+        });
+        
+        if (!hasUrl || !hasKey) {
+          console.error('[Login Debug] Missing environment variables! Check your hosting platform settings.');
+        }
+      }
+    }
   }, []);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -76,7 +95,22 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       console.error('Login failed:', err);
-      setError(err.message || 'Failed to sign in. Please check your email and password.');
+      
+      // Provide more helpful error messages
+      let errorMessage = err.message || 'Failed to sign in. Please check your email and password.';
+      
+      // Check for common production issues
+      if (err.message?.includes('Missing Supabase environment variables')) {
+        errorMessage = 'Configuration error: Supabase credentials are missing. Please contact support.';
+      } else if (err.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password. Please try again.';
+      } else if (err.message?.includes('Session not persisted') || err.message?.includes('Session was not saved')) {
+        errorMessage = 'Session could not be saved. This may be a cookie issue. Please try again or contact support.';
+      } else if (err.message?.includes('fetch') || err.message?.includes('network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
