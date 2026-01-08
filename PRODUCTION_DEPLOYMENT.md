@@ -34,7 +34,6 @@ Missing or incorrect `netlify.toml` configuration file. Netlify needs to know th
    ```toml
    [build]
      command = "npm run build"
-     publish = ".next"
 
    [[plugins]]
      package = "@netlify/plugin-nextjs"
@@ -43,11 +42,12 @@ Missing or incorrect `netlify.toml` configuration file. Netlify needs to know th
      NODE_VERSION = "20"
    ```
 
-2. In Netlify Dashboard:
+2. **CRITICAL - In Netlify Dashboard:**
    - Go to Site settings → Build & deploy → Build settings
    - Build command: `npm run build` (should auto-detect from netlify.toml)
-   - **IMPORTANT:** Publish directory: Set to `.next` (or leave empty - the plugin handles it, but UI setting must not be `/` or repo root)
-   - Node version: 20 (updated from 18 due to deprecation warnings)
+   - **Publish directory: MUST BE EMPTY or set to `.next`** - Do NOT set it to `/` or the repo root!
+   - If publish directory is set to the repo root, the plugin will fail with: "Your publish directory cannot be the same as the base directory"
+   - Node version: 20 (updated from 18 due to Supabase deprecation warnings)
 
 3. **Important:** The `@netlify/plugin-nextjs` plugin will be automatically installed by Netlify. You don't need to add it to package.json.
 
