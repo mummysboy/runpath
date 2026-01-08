@@ -73,9 +73,9 @@ export default async function TicketDetailPage({
     .from('user_roles')
     .select('*, roles(*)')
     .eq('user_id', user.id);
-  const isAdmin = userRoles?.some((ur: any) => ur.roles?.name === 'Admin');
-  const isUX = userRoles?.some((ur: any) => ur.roles?.name === 'UX Researcher');
-  const isDev = userRoles?.some((ur: any) => ur.roles?.name === 'Developer');
+  const isAdmin = userRoles?.some((ur: any) => ur.roles?.name === 'Admin') ?? false;
+  const isUX = userRoles?.some((ur: any) => ur.roles?.name === 'UX Researcher') ?? false;
+  const isDev = userRoles?.some((ur: any) => ur.roles?.name === 'Developer') ?? false;
   const isClient = projectMember?.member_role === 'client';
   
   // Check project member roles as well

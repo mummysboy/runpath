@@ -35,7 +35,7 @@ export default async function ProjectsPage() {
     .select('*, roles(*)')
     .eq('user_id', user.id);
 
-  const isAdmin = userRoles?.some((ur: any) => ur.roles?.name === 'Admin');
+  const isAdmin = userRoles?.some((ur: any) => ur.roles?.name === 'Admin') ?? false;
 
   // If admin, get all org projects
   let projects;
