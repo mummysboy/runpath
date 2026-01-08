@@ -38,14 +38,25 @@ export default function LoginPage() {
       const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
       
       if (isProduction) {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+        // Extract project ID from URL for comparison (without exposing full URL)
+        const projectIdMatch = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/);
+        const projectId = projectIdMatch ? projectIdMatch[1] : 'unknown';
+        
         console.log('[Login Debug] Environment check:', {
           hasSupabaseUrl: hasUrl,
           hasSupabaseKey: hasKey,
           hostname: window.location.hostname,
+          supabaseProjectId: projectId.substring(0, 8) + '...', // Only show first 8 chars for security
         });
         
         if (!hasUrl || !hasKey) {
           console.error('[Login Debug] Missing environment variables! Check your hosting platform settings.');
+        } else {
+          console.log('[Login Debug] ⚠️  If login fails with "No accounts registered", verify:');
+          console.log('[Login Debug] 1. Environment variables match your local .env.local');
+          console.log('[Login Debug] 2. User exists in the Supabase project specified by NEXT_PUBLIC_SUPABASE_URL');
+          console.log('[Login Debug] 3. Supabase project is active (not paused)');
         }
       }
     }
@@ -64,6 +75,26 @@ export default function LoginPage() {
 
       if (error) {
         console.error('Login error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+        });
+        
+        // Check for specific error messages
+        if (error.message?.includes('No accounts are currently registered') || 
+            error.message?.includes('Invalid login credentials')) {
+          // This could mean:
+          // 1. User doesn't exist in this Supabase project
+          // 2. Environment variables point to wrong Supabase project
+          // 3. User exists but password is wrong
+          console.error('[Login] Possible causes:');
+          console.error('1. User does not exist in Supabase Auth');
+          console.error('2. Environment variables point to different Supabase project');
+          console.error('3. Incorrect password');
+          console.error('4. Supabase project is paused or inactive');
+        }
+        
         throw error;
       }
 
@@ -102,6 +133,8 @@ export default function LoginPage() {
       // Check for common production issues
       if (err.message?.includes('Missing Supabase environment variables')) {
         errorMessage = 'Configuration error: Supabase credentials are missing. Please contact support.';
+      } else if (err.message?.includes('No accounts are currently registered')) {
+        errorMessage = 'No account found with this email. This usually means: (1) The user doesn\'t exist in this Supabase project, or (2) Your production environment is pointing to a different Supabase project than where the user was created. Please verify your environment variables match your local setup.';
       } else if (err.message?.includes('Invalid login credentials')) {
         errorMessage = 'Invalid email or password. Please try again.';
       } else if (err.message?.includes('Session not persisted') || err.message?.includes('Session was not saved')) {

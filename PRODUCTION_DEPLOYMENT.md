@@ -2,6 +2,23 @@
 
 ## Common Issues When Deploying
 
+### Issue 0: "No accounts are currently registered" Error
+
+**Symptoms:**
+- Error message: "No accounts are currently registered. Please contact support if you believe this is an error."
+- Login works locally but fails in production
+
+**Most Common Cause:**
+Environment variables in production point to a **different Supabase project** than where your user was created.
+
+**Quick Fix:**
+1. Check your local `.env.local` file for `NEXT_PUBLIC_SUPABASE_URL`
+2. Compare it with production environment variables in your hosting platform
+3. They must match! If they don't, update production to match local
+4. Redeploy after updating environment variables
+
+**See `FIX_PRODUCTION_LOGIN.md` for detailed troubleshooting steps.**
+
 ### Issue 1: Login Page Looks Different (Styling Issues)
 
 **Symptoms:**
