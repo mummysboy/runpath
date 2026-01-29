@@ -6,6 +6,8 @@ import TicketStatusChange from '@/components/TicketStatusChange';
 import TicketActions from '@/components/TicketActions';
 import TicketEvidenceSection from '@/components/TicketEvidenceSection';
 import FormattedText from '@/components/FormattedText';
+import TicketTags from '@/components/TicketTags';
+import TicketAssignee from '@/components/TicketAssignee';
 
 export default async function TicketDetailPage({
   params,
@@ -51,6 +53,17 @@ export default async function TicketDetailPage({
       .eq('user_id', ticket.created_by)
       .single();
     createdByProfile = profileData;
+  }
+
+  // Get assignee profile if assigned
+  let assigneeProfile = null;
+  if (ticket?.assigned_to) {
+    const { data: profileData } = await supabase
+      .from('users_profile')
+      .select('*')
+      .eq('user_id', ticket.assigned_to)
+      .single();
+    assigneeProfile = profileData;
   }
 
   if (ticketError || !ticket || ticket.org_id !== profile.org_id) {
@@ -112,6 +125,14 @@ export default async function TicketDetailPage({
     .eq('ticket_id', ticketId)
     .order('created_at', { ascending: false });
 
+  // Get ticket tags
+  const { data: tagAssignments } = await supabase
+    .from('ticket_tag_assignments')
+    .select('*, ticket_tags(*)')
+    .eq('ticket_id', ticketId);
+
+  const ticketTags = tagAssignments?.map((ta: any) => ta.ticket_tags).filter(Boolean) || [];
+
   // Get changed_by profiles separately
   const changedByIds = statusHistory?.map((h: any) => h.changed_by).filter(Boolean) || [];
   let changedByProfiles: Record<string, any> = {};
@@ -129,6 +150,7 @@ export default async function TicketDetailPage({
   }
 
   const canChangeStatus = isAdmin || projectMember?.member_role === 'dev' || projectMember?.member_role === 'admin';
+  const canEdit = isAdmin || isUX || isProjectAdmin || isProjectUX || isCreator;
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -152,8 +174,13 @@ export default async function TicketDetailPage({
             <p className="text-[#b7c1cf]">
               Project: {ticket.projects?.name} • Created by {createdByProfile?.full_name || 'Unknown'}
             </p>
+            {ticketTags.length > 0 && (
+              <div className="mt-3">
+                <TicketTags tags={ticketTags} size="md" />
+              </div>
+            )}
           </div>
-          <div className="flex gap-2 ml-4">
+          <div className="flex gap-2 ml-4 flex-wrap justify-end">
             {ticket.archived && (
               <span className="px-3 py-1 rounded-full text-sm font-medium bg-[rgba(250,204,21,0.15)] text-yellow-300">
                 Archived
@@ -170,6 +197,18 @@ export default async function TicketDetailPage({
             <span className="px-3 py-1 rounded-full text-sm font-medium bg-[rgba(255,255,255,0.05)] text-[#9eacc2]">
               {ticket.type}
             </span>
+            {ticket.due_date && (
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                new Date(ticket.due_date) < new Date() && ticket.status !== 'closed' && ticket.status !== 'resolved'
+                  ? 'bg-[rgba(248,113,113,0.15)] text-[#f87171]'
+                  : 'bg-[rgba(255,255,255,0.05)] text-[#9eacc2]'
+              }`}>
+                {new Date(ticket.due_date) < new Date() && ticket.status !== 'closed' && ticket.status !== 'resolved'
+                  ? `Overdue (${new Date(ticket.due_date).toLocaleDateString()})`
+                  : `Due ${new Date(ticket.due_date).toLocaleDateString()}`
+                }
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -203,6 +242,15 @@ export default async function TicketDetailPage({
         </div>
 
         <div className="space-y-6">
+          {canEdit && (
+            <Link
+              href={`/app/tickets/${ticketId}/edit`}
+              className="block w-full px-4 py-3 rounded-lg bg-[rgba(94,160,255,0.15)] border border-[rgba(94,160,255,0.3)] text-[#8fc2ff] text-center font-medium hover:bg-[rgba(94,160,255,0.2)] transition"
+            >
+              Edit Ticket
+            </Link>
+          )}
+
           {canChangeStatus && (
             <TicketStatusChange ticket={ticket} userId={user.id} />
           )}
@@ -233,10 +281,32 @@ export default async function TicketDetailPage({
                 <p className="text-[#9eacc2]">Type</p>
                 <p className="text-[#f4f6fb] font-medium">{ticket.type}</p>
               </div>
+              <TicketAssignee
+                ticketId={ticketId}
+                projectId={ticket.project_id}
+                currentAssigneeId={ticket.assigned_to}
+                currentAssigneeName={assigneeProfile?.full_name || null}
+                canEdit={isAdmin || isProjectAdmin || isProjectUX}
+              />
               <div>
                 <p className="text-[#9eacc2]">Client Visible</p>
                 <p className="text-[#f4f6fb] font-medium">{ticket.client_visible ? 'Yes' : 'No'}</p>
               </div>
+              {ticket.due_date && (
+                <div>
+                  <p className="text-[#9eacc2]">Due Date</p>
+                  <p className={`font-medium ${
+                    new Date(ticket.due_date) < new Date() && ticket.status !== 'closed' && ticket.status !== 'resolved'
+                      ? 'text-[#f87171]'
+                      : 'text-[#f4f6fb]'
+                  }`}>
+                    {new Date(ticket.due_date).toLocaleDateString()}
+                    {new Date(ticket.due_date) < new Date() && ticket.status !== 'closed' && ticket.status !== 'resolved' && (
+                      <span className="ml-2 text-xs">(Overdue)</span>
+                    )}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="text-[#9eacc2]">Created</p>
                 <p className="text-[#f4f6fb] font-medium">

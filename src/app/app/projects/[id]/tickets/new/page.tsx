@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import ImageUpload from '@/components/ImageUpload';
 import RichTextEditor from '@/components/RichTextEditor';
+import TicketTagSelector from '@/components/TicketTagSelector';
+import AssigneeSelector from '@/components/AssigneeSelector';
 
 export default function NewTicketPage() {
   const router = useRouter();
@@ -22,6 +24,7 @@ export default function NewTicketPage() {
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
     type: 'bug' as 'bug' | 'feature' | 'improvement' | 'question',
     client_visible: true,
+    due_date: '',
   });
   const [titleHtml, setTitleHtml] = useState('');
   const [titleFormatting, setTitleFormatting] = useState<any>({});
@@ -29,6 +32,8 @@ export default function NewTicketPage() {
   const [descriptionFormatting, setDescriptionFormatting] = useState<any>({});
   const [evidence, setEvidence] = useState<Array<{ kind: 'link' | 'file'; url: string; label: string }>>([]);
   const [newEvidence, setNewEvidence] = useState({ kind: 'link' as 'link' | 'file', url: '', label: '' });
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [assignedTo, setAssignedTo] = useState<string | null>(null);
 
   // Check if user is admin or UX writer
   useEffect(() => {
@@ -108,6 +113,8 @@ export default function NewTicketPage() {
         client_visible: formData.client_visible,
         status: 'open',
         archived: false, // Explicitly set archived to false
+        due_date: formData.due_date || null, // Optional due date
+        assigned_to: assignedTo, // Optional assignee
       };
 
       // Only add formatting fields if they have values (and columns exist)
@@ -165,6 +172,15 @@ export default function NewTicketPage() {
             note: 'Ticket created',
           });
 
+          // Assign tags to ticket
+          if (selectedTags.length > 0) {
+            const tagAssignments = selectedTags.map(tagId => ({
+              ticket_id: finalTicket.id,
+              tag_id: tagId,
+            }));
+            await supabase.from('ticket_tag_assignments').insert(tagAssignments);
+          }
+
           router.push(`/app/tickets/${finalTicket.id}`);
           return;
         }
@@ -199,6 +215,15 @@ export default function NewTicketPage() {
         to_status: 'open',
         note: 'Ticket created',
       });
+
+      // Assign tags to ticket
+      if (selectedTags.length > 0) {
+        const tagAssignments = selectedTags.map(tagId => ({
+          ticket_id: ticket.id,
+          tag_id: tagId,
+        }));
+        await supabase.from('ticket_tag_assignments').insert(tagAssignments);
+      }
 
       router.push(`/app/tickets/${ticket.id}`);
     } catch (err: any) {
@@ -354,6 +379,44 @@ export default function NewTicketPage() {
           </div>
         </div>
 
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="due_date" className="block text-sm font-medium mb-2 text-[#d6dbe5]">
+              Due Date (Optional)
+            </label>
+            <input
+              id="due_date"
+              type="date"
+              value={formData.due_date}
+              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+              className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#f4f6fb] focus:outline-none focus:border-[rgba(94,160,255,0.5)] focus:bg-[rgba(255,255,255,0.07)] [color-scheme:dark]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2 text-[#d6dbe5]">
+              Assign To (Optional)
+            </label>
+            <AssigneeSelector
+              projectId={projectId}
+              selectedUserId={assignedTo}
+              onAssigneeChange={setAssignedTo}
+              disabled={loading}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2 text-[#d6dbe5]">
+            Tags (Optional)
+          </label>
+          <TicketTagSelector
+            projectId={projectId}
+            selectedTags={selectedTags}
+            onTagsChange={setSelectedTags}
+            disabled={loading}
+          />
+        </div>
 
         <div>
           <label className="flex items-center gap-3 cursor-pointer">

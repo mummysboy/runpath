@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { addProjectMember, removeProjectMember } from './actions';
 import { UserPlus, X, Users } from 'lucide-react';
 
@@ -33,6 +34,7 @@ export default function ManageProjectMembers({
   currentMembers,
   availableUsers,
 }: ManageProjectMembersProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedRole, setSelectedRole] = useState<'admin' | 'ux' | 'dev' | 'client'>('dev');
@@ -60,8 +62,8 @@ export default function ManageProjectMembers({
       if (result.success) {
         setMessage({ type: 'success', text: result.message });
         setSelectedUserId('');
-        // Reload the page to show updated members
-        window.location.reload();
+        setIsOpen(false);
+        router.refresh();
       } else {
         setMessage({ type: 'error', text: result.message });
       }
@@ -82,8 +84,7 @@ export default function ManageProjectMembers({
 
       if (result.success) {
         setMessage({ type: 'success', text: result.message });
-        // Reload the page to show updated members
-        window.location.reload();
+        router.refresh();
       } else {
         setMessage({ type: 'error', text: result.message });
       }

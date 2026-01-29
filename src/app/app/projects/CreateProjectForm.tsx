@@ -83,10 +83,15 @@ export default function CreateProjectForm({
     if (result.success) {
       // Store clientId before any state updates
       const createdClientId = clientId;
-      
+
+      // Show warning if member assignment partially failed
+      const displayMessage = result.warning
+        ? `${result.message}. ${result.warning}`
+        : result.message;
+
       if (onSuccess) {
         // If onSuccess callback is provided, use it
-        setMessage({ type: 'success', text: result.message });
+        setMessage({ type: result.warning ? 'error' : 'success', text: displayMessage });
         setName('');
         setClientId(defaultClientId || '');
         setStatus('planning');
@@ -99,7 +104,7 @@ export default function CreateProjectForm({
           setIsOpen(false);
           setMessage(null);
           onSuccess();
-        }, 500);
+        }, result.warning ? 2000 : 500);
       } else {
         // Redirect to the client detail page showing projects for this client
         if (!createdClientId) {
@@ -110,10 +115,7 @@ export default function CreateProjectForm({
         }
         
         const redirectUrl = `/app/admin/clients/${createdClientId}`;
-        console.log('[CreateProjectForm] Project created successfully. Redirecting to:', redirectUrl);
-        console.log('[CreateProjectForm] createdClientId:', createdClientId);
-        console.log('[CreateProjectForm] Full redirect URL:', redirectUrl);
-        
+
         // Reset form state
         setName('');
         setClientId('');
@@ -124,10 +126,9 @@ export default function CreateProjectForm({
         setNewMemberUserId('');
         setNewMemberRole('dev');
         setIsOpen(false);
-        
-        // Use window.location for a hard redirect to ensure it works
-        // This will completely replace the current page
-        window.location.href = redirectUrl;
+
+        // Use Next.js router for navigation
+        router.push(redirectUrl);
       }
     } else {
       setMessage({ type: 'error', text: result.message });

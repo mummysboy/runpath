@@ -43,46 +43,13 @@ function sanitizeForDevelopers(text: string): string {
   // Remove exclamation marks
   sanitized = sanitized.replace(/!/g, '');
   
-  // Convert all-caps text to normal case (sentence case)
-  // Check if text is all caps (has at least one letter and all letters are uppercase)
-  const hasLetters = /[a-zA-Z]/.test(sanitized);
-  if (hasLetters) {
-    // Extract only letters (ignoring spaces, punctuation, numbers)
-    const lettersOnly = sanitized.replace(/[^a-zA-Z]/g, '');
-    // Check if all letters are uppercase and there are at least 2 letters
-    // (to avoid converting single letters like "I" or "A")
-    if (lettersOnly.length >= 2 && lettersOnly === lettersOnly.toUpperCase()) {
-      // Convert to sentence case: only first letter of sentences uppercase, rest lowercase
-      // Split by sentence boundaries (. ! ? followed by space or end of string)
-      // Process sentence by sentence
-      const sentenceEnders = /([.!?])\s+/g;
-      const parts = sanitized.split(sentenceEnders);
-      
-      sanitized = parts
-        .map((part, index) => {
-          // Keep sentence-ending punctuation and spaces as-is
-          if (/^[.!?]\s*$/.test(part)) {
-            return part;
-          }
-          
-          // Find first letter in this part
-          const firstLetterMatch = part.match(/[a-zA-Z]/);
-          if (!firstLetterMatch || firstLetterMatch.index === undefined) {
-            return part;
-          }
-          
-          const firstLetterIndex = firstLetterMatch.index;
-          
-          // Capitalize first letter only, lowercase everything else
-          return (
-            part.substring(0, firstLetterIndex) +
-            part[firstLetterIndex].toUpperCase() +
-            part.substring(firstLetterIndex + 1).toLowerCase()
-          );
-        })
-        .join('');
-    }
-  }
+  // Convert individual ALL CAPS words to lowercase
+  // This finds words that are 2+ letters and entirely uppercase, then converts them to lowercase
+  // Examples: "URGENT" -> "urgent", "ASAP" -> "asap", "FIX THIS NOW" -> "fix this now"
+  // Single letters like "I" or "A" are preserved
+  sanitized = sanitized.replace(/\b([A-Z]{2,})\b/g, (match) => {
+    return match.toLowerCase();
+  });
   
   // Clean up multiple spaces and trim
   sanitized = sanitized.replace(/\s+/g, ' ').trim();
@@ -139,11 +106,25 @@ export default function FormattedText({
     );
   }
 
+  // Helper to strip HTML for non-HTML display
+  const stripHtml = (html: string): string => {
+    return html
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   // Legacy formatting support (for backwards compatibility)
   if (formatting && Object.keys(formatting).length > 0) {
-    let displayText = text;
+    let displayText = stripHtml(text);
     if (formatting.allCaps) {
-      displayText = text.toUpperCase();
+      displayText = displayText.toUpperCase();
     }
 
     const className = [
@@ -173,6 +154,7 @@ export default function FormattedText({
     return <span className={className || undefined}>{displayText}</span>;
   }
 
-  // Default: just show the text
-  return <>{text}</>;
+  // Default: strip HTML tags and show clean text
+  const cleanText = stripHtml(text);
+  return <>{cleanText}</>;
 }

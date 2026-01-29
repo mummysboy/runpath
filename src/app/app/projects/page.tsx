@@ -50,7 +50,10 @@ export default async function ProjectsPage() {
   } else {
     projects = projectMembers?.map((pm: any) => ({
       ...pm.projects,
-      clients: pm.projects?.clients,
+      clients: pm.projects?.clients ? {
+        id: pm.projects.clients.id,
+        name: pm.projects.clients.name,
+      } : undefined,
       project_members: [{ user_id: user.id, member_role: pm.member_role }],
     }));
   }

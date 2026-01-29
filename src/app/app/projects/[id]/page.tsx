@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Calendar, Ticket, FileText, Users, AlertCircle, Clock } from 'lucide-react';
 import ManageProjectMembers from '../ManageProjectMembers';
 import ProjectActions from '@/components/ProjectActions';
-import FormattedText from '@/components/FormattedText';
+import DraggableTicketList from '@/components/DraggableTicketList';
 
 export default async function ProjectDetailPage({
   params,
@@ -280,40 +280,94 @@ export default async function ProjectDetailPage({
     console.error('[Project Detail] Error fetching tickets:', ticketsError);
   }
 
-  // Get recent ticket comments as notes
+  // Get recent ticket comments and status changes as activity
   const ticketIds = tickets?.map((t: any) => t.id) || [];
-  let recentComments: any[] = [];
+  let recentActivity: any[] = [];
+
   if (ticketIds.length > 0) {
-    // Get comments first
+    // Get comments
     const { data: commentsData, error: commentsError } = await supabase
       .from('ticket_comments')
       .select('*')
       .in('ticket_id', ticketIds)
       .order('created_at', { ascending: false })
       .limit(10);
-    
+
     if (commentsError) {
       console.error('[Project Detail] Error fetching comments:', commentsError);
     }
-    
-    if (commentsData && commentsData.length > 0) {
-      // Get author profiles
-      const authorIds = Array.from(new Set(commentsData.map((c: any) => c.author_id)));
+
+    // Get status changes
+    const { data: statusChangesData, error: statusError } = await supabase
+      .from('ticket_status_history')
+      .select('*')
+      .in('ticket_id', ticketIds)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (statusError) {
+      console.error('[Project Detail] Error fetching status changes:', statusError);
+    }
+
+    // Collect all user IDs for profile lookup
+    const allUserIds = new Set<string>();
+    commentsData?.forEach((c: any) => c.author_id && allUserIds.add(c.author_id));
+    statusChangesData?.forEach((s: any) => s.changed_by && allUserIds.add(s.changed_by));
+
+    // Get all profiles
+    let activityProfiles: Record<string, any> = {};
+    if (allUserIds.size > 0) {
       const { data: profiles } = await supabase
         .from('users_profile')
         .select('user_id, full_name')
-        .in('user_id', authorIds);
-      
-      // Combine comments with profiles
-      recentComments = commentsData.map((comment: any) => ({
-        ...comment,
-        author_profile: profiles?.find((p: any) => p.user_id === comment.author_id),
-      }));
+        .in('user_id', Array.from(allUserIds));
+
+      if (profiles) {
+        activityProfiles = profiles.reduce((acc: Record<string, any>, p: any) => {
+          acc[p.user_id] = p;
+          return acc;
+        }, {});
+      }
     }
+
+    // Map comments to activity items
+    const commentActivities = (commentsData || []).map((comment: any) => ({
+      id: comment.id,
+      type: 'comment' as const,
+      ticket_id: comment.ticket_id,
+      user_id: comment.author_id,
+      user_profile: activityProfiles[comment.author_id],
+      body: comment.body,
+      is_internal: comment.is_internal,
+      created_at: comment.created_at,
+    }));
+
+    // Map status changes to activity items
+    const statusActivities = (statusChangesData || []).map((change: any) => ({
+      id: change.id,
+      type: 'status_change' as const,
+      ticket_id: change.ticket_id,
+      user_id: change.changed_by,
+      user_profile: activityProfiles[change.changed_by],
+      from_status: change.from_status,
+      to_status: change.to_status,
+      note: change.note,
+      created_at: change.created_at,
+    }));
+
+    // Combine and sort by date
+    recentActivity = [...commentActivities, ...statusActivities]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 15);
   }
 
-  // Sort tickets by priority (highest to lowest)
+  // Sort tickets by sort_order (manual order), then by priority as fallback
   const sortedTickets = tickets ? [...tickets].sort((a: any, b: any) => {
+    // If both have sort_order, use that
+    if (a.sort_order !== null && b.sort_order !== null && a.sort_order !== b.sort_order) {
+      return a.sort_order - b.sort_order;
+    }
+    // Fall back to priority
     return getPriorityOrder(b.priority) - getPriorityOrder(a.priority);
   }) : [];
 
@@ -352,6 +406,7 @@ export default async function ProjectDetailPage({
   };
 
   const canCreateTicket = isAdmin || userMemberRole === 'admin' || userMemberRole === 'dev' || userMemberRole === 'ux';
+  const canReorderTickets = isAdmin || isUX || isProjectAdmin || isProjectUX;
 
   // Fetch available users for member management (admin only)
   let availableUsers: Array<{ user_id: string; full_name: string | null; email?: string }> = [];
@@ -473,136 +528,52 @@ export default async function ProjectDetailPage({
             </div>
 
             {/* Open Tickets */}
-            {ticketsByStatus.open.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-[#9eacc2] mb-3 uppercase tracking-wider">Open ({ticketsByStatus.open.length})</h3>
-                <div className="space-y-3">
-                  {ticketsByStatus.open.map((ticket: any) => (
-                    <Link
-                      key={ticket.id}
-                      href={`/app/tickets/${ticket.id}`}
-                      className="block bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] rounded-lg p-4 hover:border-[rgba(239,68,68,0.4)] transition"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-[#f4f6fb] mb-1">
-                            <FormattedText 
-                              text={ticket.title} 
-                              showAsPlain={isDeveloper}
-                              formatting={canSeeFormatting ? (ticket.title_formatting as any) : undefined} 
-                            />
-                          </h4>
-                          <p className="text-sm text-[#9eacc2] line-clamp-2">
-                            <FormattedText 
-                              text={ticket.description || ''} 
-                              showAsPlain={isDeveloper}
-                              formatting={canSeeFormatting ? (ticket.description_formatting as any) : undefined} 
-                            />
-                          </p>
-                          <p className="text-xs text-[#7a8799] mt-2">
-                            Created by {creatorProfiles[ticket.created_by]?.full_name || 'Unknown'} • {new Date(ticket.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="ml-4 flex flex-col gap-2">
-                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(239,68,68,0.2)] text-red-300 whitespace-nowrap">
-                            {ticket.status}
-                          </span>
-                          {!isDeveloper && (
-                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(255,255,255,0.05)] text-[#9eacc2] whitespace-nowrap">
-                              {ticket.priority}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
+            <DraggableTicketList
+              initialTickets={ticketsByStatus.open}
+              creatorProfiles={creatorProfiles}
+              canReorder={canReorderTickets}
+              isDeveloper={isDeveloper}
+              statusColor={{
+                bg: 'bg-[rgba(239,68,68,0.08)]',
+                border: 'border-[rgba(239,68,68,0.2)]',
+                hoverBorder: 'border-[rgba(239,68,68,0.4)]',
+                badge: 'bg-[rgba(239,68,68,0.2)]',
+                badgeText: 'text-red-300',
+              }}
+              statusLabel="Open"
+            />
 
             {/* In Progress Tickets */}
-            {ticketsByStatus.in_progress.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-[#9eacc2] mb-3 uppercase tracking-wider">In Progress ({ticketsByStatus.in_progress.length})</h3>
-                <div className="space-y-3">
-                  {ticketsByStatus.in_progress.map((ticket: any) => (
-                    <Link
-                      key={ticket.id}
-                      href={`/app/tickets/${ticket.id}`}
-                      className="block bg-[rgba(250,204,21,0.08)] border border-[rgba(250,204,21,0.2)] rounded-lg p-4 hover:border-[rgba(250,204,21,0.4)] transition"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-[#f4f6fb] mb-1">
-                            <FormattedText 
-                              text={ticket.title} 
-                              showAsPlain={isDeveloper}
-                              formatting={canSeeFormatting ? (ticket.title_formatting as any) : undefined} 
-                            />
-                          </h4>
-                          <p className="text-sm text-[#9eacc2] line-clamp-2">
-                            <FormattedText 
-                              text={ticket.description || ''} 
-                              showAsPlain={isDeveloper}
-                              formatting={canSeeFormatting ? (ticket.description_formatting as any) : undefined} 
-                            />
-                          </p>
-                          <p className="text-xs text-[#7a8799] mt-2">
-                            Created by {creatorProfiles[ticket.created_by]?.full_name || 'Unknown'} • {new Date(ticket.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="ml-4 flex flex-col gap-2">
-                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(250,204,21,0.2)] text-yellow-300 whitespace-nowrap">
-                            {ticket.status}
-                          </span>
-                          {!isDeveloper && (
-                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(255,255,255,0.05)] text-[#9eacc2] whitespace-nowrap">
-                              {ticket.priority}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
+            <DraggableTicketList
+              initialTickets={ticketsByStatus.in_progress}
+              creatorProfiles={creatorProfiles}
+              canReorder={canReorderTickets}
+              isDeveloper={isDeveloper}
+              statusColor={{
+                bg: 'bg-[rgba(250,204,21,0.08)]',
+                border: 'border-[rgba(250,204,21,0.2)]',
+                hoverBorder: 'border-[rgba(250,204,21,0.4)]',
+                badge: 'bg-[rgba(250,204,21,0.2)]',
+                badgeText: 'text-yellow-300',
+              }}
+              statusLabel="In Progress"
+            />
 
             {/* Resolved/Closed Tickets */}
-            {(ticketsByStatus.resolved.length > 0 || ticketsByStatus.closed.length > 0) && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-[#9eacc2] mb-3 uppercase tracking-wider">
-                  Resolved ({ticketsByStatus.resolved.length + ticketsByStatus.closed.length})
-                </h3>
-                <div className="space-y-3">
-                  {[...ticketsByStatus.resolved, ...ticketsByStatus.closed].slice(0, 5).map((ticket: any) => (
-                    <Link
-                      key={ticket.id}
-                      href={`/app/tickets/${ticket.id}`}
-                      className="block bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-4 hover:border-[rgba(94,160,255,0.2)] transition opacity-75"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-[#f4f6fb] mb-1">
-                            <FormattedText 
-                              text={ticket.title} 
-                              showAsPlain={isDeveloper}
-                              formatting={canSeeFormatting ? (ticket.title_formatting as any) : undefined} 
-                            />
-                          </h4>
-                          <p className="text-xs text-[#7a8799] mt-2">
-                            {new Date(ticket.updated_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-[rgba(34,197,94,0.2)] text-green-300 whitespace-nowrap">
-                          {ticket.status}
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
+            <DraggableTicketList
+              initialTickets={[...ticketsByStatus.resolved, ...ticketsByStatus.closed]}
+              creatorProfiles={creatorProfiles}
+              canReorder={false}
+              isDeveloper={isDeveloper}
+              statusColor={{
+                bg: 'bg-[rgba(255,255,255,0.03)]',
+                border: 'border-[rgba(255,255,255,0.06)]',
+                hoverBorder: 'border-[rgba(94,160,255,0.2)]',
+                badge: 'bg-[rgba(34,197,94,0.2)]',
+                badgeText: 'text-green-300',
+              }}
+              statusLabel="Resolved"
+            />
 
             {tickets?.length === 0 && (
               <div className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-xl p-8 text-center">
@@ -620,42 +591,95 @@ export default async function ProjectDetailPage({
             )}
           </div>
 
-          {/* Recent Notes/Comments */}
-          {recentComments.length > 0 && (
+          {/* Recent Activity (Comments + Status Changes) */}
+          {recentActivity.length > 0 && (
             <div>
               <h2 className="text-2xl font-semibold mb-4 text-[#f4f6fb] flex items-center gap-2">
                 <FileText className="w-6 h-6" />
                 Recent Activity
               </h2>
               <div className="space-y-3">
-                {recentComments.map((comment: any) => {
-                  const ticket = tickets?.find((t: any) => t.id === comment.ticket_id);
+                {recentActivity.map((activity: any) => {
+                  const ticket = tickets?.find((t: any) => t.id === activity.ticket_id);
+                  // Strip HTML from ticket title for display
+                  const cleanTitle = ticket?.title
+                    ?.replace(/<[^>]*>/g, '')
+                    .replace(/&nbsp;/g, ' ')
+                    .replace(/&amp;/g, '&')
+                    .replace(/\s+/g, ' ')
+                    .trim() || '';
+
+                  if (activity.type === 'status_change') {
+                    return (
+                      <div
+                        key={`status-${activity.id}`}
+                        className="bg-[rgba(94,160,255,0.05)] border border-[rgba(94,160,255,0.15)] rounded-lg p-4"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="text-sm font-medium text-[#f4f6fb]">
+                                {activity.user_profile?.full_name || 'Unknown'}
+                              </span>
+                              <span className="text-sm text-[#9eacc2]">changed status</span>
+                              {ticket && (
+                                <Link
+                                  href={`/app/tickets/${ticket.id}`}
+                                  className="text-xs text-[#5ea0ff] hover:text-[#8fc2ff]"
+                                >
+                                  on &quot;{cleanTitle.substring(0, 40)}{cleanTitle.length > 40 ? '...' : ''}&quot;
+                                </Link>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="px-2 py-0.5 rounded text-xs bg-[rgba(255,255,255,0.1)] text-[#9eacc2]">
+                                {activity.from_status || 'new'}
+                              </span>
+                              <span className="text-[#7a8799]">→</span>
+                              <span className="px-2 py-0.5 rounded text-xs bg-[rgba(94,160,255,0.2)] text-[#8fc2ff]">
+                                {activity.to_status}
+                              </span>
+                            </div>
+                            {activity.note && activity.note !== 'Ticket created' && (
+                              <p className="text-sm text-[#d6dbe5] mb-2 italic">&quot;{activity.note}&quot;</p>
+                            )}
+                            <p className="text-xs text-[#7a8799]">
+                              {new Date(activity.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Comment activity
                   return (
                     <div
-                      key={comment.id}
+                      key={`comment-${activity.id}`}
                       className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-4"
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <span className="text-sm font-medium text-[#f4f6fb]">
-                              {comment.author_profile?.full_name || 'Unknown'}
+                              {activity.user_profile?.full_name || 'Unknown'}
                             </span>
+                            <span className="text-sm text-[#9eacc2]">commented</span>
                             {ticket && (
                               <Link
                                 href={`/app/tickets/${ticket.id}`}
                                 className="text-xs text-[#5ea0ff] hover:text-[#8fc2ff]"
                               >
-                                on "{ticket.title}"
+                                on &quot;{cleanTitle.substring(0, 40)}{cleanTitle.length > 40 ? '...' : ''}&quot;
                               </Link>
                             )}
                           </div>
-                          <p className="text-sm text-[#d6dbe5] mb-2">{comment.body}</p>
+                          <p className="text-sm text-[#d6dbe5] mb-2">{activity.body}</p>
                           <p className="text-xs text-[#7a8799]">
-                            {new Date(comment.created_at).toLocaleString()}
+                            {new Date(activity.created_at).toLocaleString()}
                           </p>
                         </div>
-                        {comment.is_internal && (
+                        {activity.is_internal && (
                           <span className="px-2 py-1 rounded text-xs bg-[rgba(94,160,255,0.15)] text-[#8fc2ff]">
                             Internal
                           </span>

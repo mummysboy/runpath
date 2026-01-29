@@ -20,6 +20,7 @@ export interface CreateProjectResult {
   success: boolean;
   message: string;
   projectId?: string;
+  warning?: string;
 }
 
 /**
@@ -149,21 +150,23 @@ export async function createProject(
     }
 
     // Insert all members at once
+    let memberWarning: string | undefined;
     if (membersToAdd.length > 0) {
       const { error: memberError } = await supabase
         .from('project_members')
         .insert(membersToAdd);
 
       if (memberError) {
-        // If adding members fails, still return success but log the error
         console.error('Failed to add project members:', memberError);
+        memberWarning = 'Project created but some team members could not be added. Please add them manually.';
       }
     }
 
     return {
       success: true,
-      message: 'Project created successfully',
+      message: memberWarning ? 'Project created with warnings' : 'Project created successfully',
       projectId: project.id,
+      warning: memberWarning,
     };
   } catch (error: any) {
     return {
